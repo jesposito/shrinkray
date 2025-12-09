@@ -146,13 +146,67 @@ func TestFinalizeTranscodeReplace(t *testing.T) {
 		t.Fatalf("FinalizeTranscode failed: %v", err)
 	}
 
-	// Original should be renamed to .old
-	oldPath := originalPath + ".old"
-	if _, err := os.Stat(oldPath); os.IsNotExist(err) {
-		t.Error("original was not renamed to .old")
+	// For mkv→mkv, finalPath == originalPath, so the file should exist
+	// but contain transcoded content (original was replaced)
+	if finalPath != originalPath {
+		t.Errorf("expected final path %s to equal original path %s for mkv→mkv", finalPath, originalPath)
 	}
 
-	// Final path should contain transcoded content
+	// .old file should NOT exist in replace mode
+	oldPath := originalPath + ".old"
+	if _, err := os.Stat(oldPath); !os.IsNotExist(err) {
+		t.Error(".old file exists, but replace mode should delete original")
+	}
+
+	// Final path should contain transcoded content (original was replaced)
+	content, err := os.ReadFile(finalPath)
+	if err != nil {
+		t.Fatalf("failed to read final file: %v", err)
+	}
+	if string(content) != "transcoded content" {
+		t.Error("final file has wrong content - original content should have been replaced")
+	}
+
+	// Temp file should be gone
+	if _, err := os.Stat(tempPath); !os.IsNotExist(err) {
+		t.Error("temp file still exists")
+	}
+
+	t.Logf("Replace mode (mkv→mkv): original replaced in-place, final=%s", finalPath)
+}
+
+func TestFinalizeTranscodeReplaceDifferentExt(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a fake "original" mp4 file
+	originalPath := filepath.Join(tmpDir, "video.mp4")
+	if err := os.WriteFile(originalPath, []byte("original content"), 0644); err != nil {
+		t.Fatalf("failed to create original: %v", err)
+	}
+
+	// Create a fake "temp" file (transcoded output)
+	tempPath := filepath.Join(tmpDir, "video.shrinkray.tmp.mkv")
+	if err := os.WriteFile(tempPath, []byte("transcoded content"), 0644); err != nil {
+		t.Fatalf("failed to create temp: %v", err)
+	}
+
+	// Finalize with replace=true
+	finalPath, err := FinalizeTranscode(originalPath, tempPath, true)
+	if err != nil {
+		t.Fatalf("FinalizeTranscode failed: %v", err)
+	}
+
+	// Original mp4 should be deleted
+	if _, err := os.Stat(originalPath); !os.IsNotExist(err) {
+		t.Error("original mp4 file still exists, should have been deleted")
+	}
+
+	// Final path should be .mkv and contain transcoded content
+	expectedFinal := filepath.Join(tmpDir, "video.mkv")
+	if finalPath != expectedFinal {
+		t.Errorf("expected final path %s, got %s", expectedFinal, finalPath)
+	}
+
 	content, err := os.ReadFile(finalPath)
 	if err != nil {
 		t.Fatalf("failed to read final file: %v", err)
@@ -161,12 +215,7 @@ func TestFinalizeTranscodeReplace(t *testing.T) {
 		t.Error("final file has wrong content")
 	}
 
-	// Temp file should be gone
-	if _, err := os.Stat(tempPath); !os.IsNotExist(err) {
-		t.Error("temp file still exists")
-	}
-
-	t.Logf("Replace mode: original→%s, final=%s", oldPath, finalPath)
+	t.Logf("Replace mode (mp4→mkv): original deleted, final=%s", finalPath)
 }
 
 func TestFinalizeTranscodeKeep(t *testing.T) {
@@ -184,19 +233,25 @@ func TestFinalizeTranscodeKeep(t *testing.T) {
 		t.Fatalf("failed to create temp: %v", err)
 	}
 
-	// Finalize with replace=false (keep both)
+	// Finalize with replace=false (keep original as .old)
 	finalPath, err := FinalizeTranscode(originalPath, tempPath, false)
 	if err != nil {
 		t.Fatalf("FinalizeTranscode failed: %v", err)
 	}
 
-	// Original should still exist with original content
-	content, err := os.ReadFile(originalPath)
+	// Original should be renamed to .old with original content
+	oldPath := originalPath + ".old"
+	content, err := os.ReadFile(oldPath)
 	if err != nil {
-		t.Fatalf("failed to read original: %v", err)
+		t.Fatalf("failed to read .old file: %v", err)
 	}
 	if string(content) != "original content" {
-		t.Error("original file was modified")
+		t.Error(".old file has wrong content")
+	}
+
+	// Original path should no longer exist (renamed to .old)
+	if _, err := os.Stat(originalPath); !os.IsNotExist(err) {
+		t.Error("original file still exists at original path, should have been renamed to .old")
 	}
 
 	// Final file should exist with transcoded content
@@ -213,7 +268,7 @@ func TestFinalizeTranscodeKeep(t *testing.T) {
 		t.Error("temp file still exists")
 	}
 
-	t.Logf("Keep mode: original=%s (kept), final=%s", originalPath, finalPath)
+	t.Logf("Keep mode: original→%s, final=%s", oldPath, finalPath)
 }
 
 func TestParseProgressLine(t *testing.T) {

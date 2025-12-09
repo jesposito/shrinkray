@@ -189,47 +189,46 @@ func BuildTempPath(inputPath, tempDir string) string {
 }
 
 // FinalizeTranscode handles the original file based on the configured behavior
-// If replace=true, renames original to .old and moves temp to original location
-// If replace=false, keeps original and renames temp to final output
+// If replace=true, deletes original and moves temp to final location
+// If replace=false (keep), renames original to .old and moves temp to final location
 func FinalizeTranscode(inputPath, tempPath string, replace bool) (finalPath string, err error) {
+	dir := filepath.Dir(inputPath)
+	base := filepath.Base(inputPath)
+	ext := filepath.Ext(base)
+	name := strings.TrimSuffix(base, ext)
+	finalPath = filepath.Join(dir, name+".mkv")
+
 	if replace {
-		// Rename original to .old
-		oldPath := inputPath + ".old"
-		if err := os.Rename(inputPath, oldPath); err != nil {
-			return "", fmt.Errorf("failed to rename original to .old: %w", err)
+		// Replace mode: delete original, move temp to final location
+		if ext == ".mkv" {
+			// Same extension - can do atomic rename by removing original first
+			if err := os.Remove(inputPath); err != nil {
+				return "", fmt.Errorf("failed to remove original file: %w", err)
+			}
+		} else {
+			// Different extension (e.g., .mp4 -> .mkv) - delete original
+			if err := os.Remove(inputPath); err != nil {
+				return "", fmt.Errorf("failed to remove original file: %w", err)
+			}
 		}
 
-		// Move temp to original location (with .mkv extension)
-		dir := filepath.Dir(inputPath)
-		base := filepath.Base(inputPath)
-		ext := filepath.Ext(base)
-		name := strings.TrimSuffix(base, ext)
-		finalPath = filepath.Join(dir, name+".mkv")
-
 		if err := os.Rename(tempPath, finalPath); err != nil {
-			// Try to restore original
-			os.Rename(oldPath, inputPath)
 			return "", fmt.Errorf("failed to move temp to final location: %w", err)
 		}
 
 		return finalPath, nil
 	}
 
-	// Keep both: temp file becomes the final output (already in place)
-	// Just rename from .shrinkray.tmp.mkv to .mkv
-	dir := filepath.Dir(tempPath)
-	base := filepath.Base(inputPath)
-	ext := filepath.Ext(base)
-	name := strings.TrimSuffix(base, ext)
-	finalPath = filepath.Join(dir, name+".mkv")
-
-	if finalPath == inputPath {
-		// Input was already .mkv, need a different name
-		finalPath = filepath.Join(dir, name+".shrinkray.mkv")
+	// Keep mode: rename original to .old, move temp to final location
+	oldPath := inputPath + ".old"
+	if err := os.Rename(inputPath, oldPath); err != nil {
+		return "", fmt.Errorf("failed to rename original to .old: %w", err)
 	}
 
 	if err := os.Rename(tempPath, finalPath); err != nil {
-		return "", fmt.Errorf("failed to rename temp to final: %w", err)
+		// Try to restore original
+		os.Rename(oldPath, inputPath)
+		return "", fmt.Errorf("failed to move temp to final location: %w", err)
 	}
 
 	return finalPath, nil

@@ -16,85 +16,125 @@ type Estimate struct {
 	Warning          string        `json:"warning,omitempty"`
 }
 
+// Bitrate modifiers matching presets.go
+const (
+	bitrateModifierStandard = 0.50 // 50% of source bitrate for "standard" quality
+	bitrateModifierSmaller  = 0.35 // 35% of source bitrate for "smaller" quality
+
+	// HEVC is ~40% more efficient than H.264 at same quality
+	// So targeting 50% of H.264 bitrate with HEVC gives similar quality
+	hevcEfficiencyGain = 0.40
+
+	// Uncertainty range for estimates
+	// Hardware encoders are less predictable than software
+	estimateUncertaintySoftware = 0.20 // ±20% for software
+	estimateUncertaintyHardware = 0.35 // ±35% for hardware (more variance)
+
+	// Audio/subtitle streams are copied unchanged
+	// Typical audio is 128-640 kbps, estimate ~15% of file is non-video
+	nonVideoOverheadRatio = 0.15
+)
+
 // EstimateTranscode estimates the output size and time for transcoding
 func EstimateTranscode(probe *ProbeResult, preset *Preset) *Estimate {
 	est := &Estimate{
 		CurrentSize: probe.Size,
 	}
 
-	// Estimate compression ratio based on source codec and preset
+	// Get base bitrate modifier from preset quality
+	bitrateModifier := bitrateModifierStandard
+	if preset.Quality == "smaller" {
+		bitrateModifier = bitrateModifierSmaller
+	}
+
+	// Calculate target bitrate
+	var targetBitrate int64
 	var compressionRatio float64
-	var compressionMin, compressionMax float64
 
-	if probe.IsHEVC {
-		// Already HEVC - minimal gains from re-encoding
-		compressionRatio = 0.95 // 5% savings typical
-		compressionMin = 0.90
-		compressionMax = 1.05 // Could actually get larger
-		est.Warning = "Already encoded in x265/HEVC. Re-encoding will save minimal space and may reduce quality."
+	if probe.Bitrate > 0 {
+		// Use bitrate-based estimation (more accurate)
+		targetBitrate = int64(float64(probe.Bitrate) * bitrateModifier)
+
+		// Apply resolution scaling if downscaling
+		if preset.MaxHeight > 0 && probe.Height > preset.MaxHeight {
+			// Bitrate scales roughly with pixel count
+			// (target_height / source_height)^2 gives pixel ratio
+			heightRatio := float64(preset.MaxHeight) / float64(probe.Height)
+			pixelRatio := heightRatio * heightRatio
+			targetBitrate = int64(float64(targetBitrate) * pixelRatio)
+		}
+
+		// Apply min/max constraints (matching presets.go)
+		targetBitrateKbps := targetBitrate / 1000
+		if targetBitrateKbps < minBitrateKbps {
+			targetBitrateKbps = minBitrateKbps
+			targetBitrate = targetBitrateKbps * 1000
+		}
+		if targetBitrateKbps > maxBitrateKbps {
+			targetBitrateKbps = maxBitrateKbps
+			targetBitrate = targetBitrateKbps * 1000
+		}
+
+		// Compression ratio = target / source
+		compressionRatio = float64(targetBitrate) / float64(probe.Bitrate)
+
+		// Adjust for source codec
+		if probe.IsHEVC {
+			// Already HEVC - re-encoding to HEVC gives minimal gains
+			// The bitrate modifier assumes H.264→HEVC efficiency gain
+			// For HEVC→HEVC, we lose that gain, so adjust upward
+			compressionRatio = compressionRatio / (1 - hevcEfficiencyGain)
+			if compressionRatio > 0.95 {
+				compressionRatio = 0.95 // Cap at 5% savings
+			}
+			est.Warning = "Already encoded in x265/HEVC. Re-encoding will save minimal space and may reduce quality."
+		}
 	} else {
-		// x264 or other codec → x265
-		// Typical savings: 40-60% for x264 → x265
-		switch preset.ID {
-		case "compress":
-			compressionRatio = 0.50 // 50% of original (50% savings)
-			compressionMin = 0.40
-			compressionMax = 0.65
-		case "compress-hard":
-			compressionRatio = 0.35 // 65% savings
-			compressionMin = 0.25
-			compressionMax = 0.50
-		case "1080p":
-			// If already <= 1080p, similar to compress
-			// If > 1080p, additional savings from downscale
-			if probe.Height > 1080 {
-				compressionRatio = 0.35
-				compressionMin = 0.25
-				compressionMax = 0.50
-			} else {
-				compressionRatio = 0.50
-				compressionMin = 0.40
-				compressionMax = 0.65
-			}
-		case "720p":
-			if probe.Height > 720 {
-				compressionRatio = 0.25
-				compressionMin = 0.15
-				compressionMax = 0.40
-			} else {
-				compressionRatio = 0.50
-				compressionMin = 0.40
-				compressionMax = 0.65
-			}
-		default:
-			compressionRatio = 0.50
-			compressionMin = 0.40
-			compressionMax = 0.65
+		// Fallback to file-size based estimation (less accurate)
+		compressionRatio = bitrateModifier
+
+		// Adjust for resolution scaling
+		if preset.MaxHeight > 0 && probe.Height > preset.MaxHeight {
+			heightRatio := float64(preset.MaxHeight) / float64(probe.Height)
+			pixelRatio := heightRatio * heightRatio
+			compressionRatio = compressionRatio * pixelRatio
 		}
 
-		// Adjust for already low bitrate content
-		// If bitrate is already low, compression gains are reduced
-		if probe.Bitrate > 0 && probe.Bitrate < 2_000_000 { // < 2 Mbps
-			compressionRatio = compressionRatio * 1.3 // Less savings
-			compressionMin = compressionMin * 1.3
-			compressionMax = compressionMax * 1.3
-			if est.Warning == "" {
-				est.Warning = "Source has low bitrate. Transcoding may not save much space."
-			}
+		// Adjust for source codec
+		if probe.IsHEVC {
+			compressionRatio = 0.95
+			est.Warning = "Already encoded in x265/HEVC. Re-encoding will save minimal space and may reduce quality."
 		}
 	}
 
-	// Calculate estimated sizes
-	est.EstimatedSize = int64(float64(probe.Size) * compressionRatio)
-	est.EstimatedSizeMin = int64(float64(probe.Size) * compressionMin)
-	est.EstimatedSizeMax = int64(float64(probe.Size) * compressionMax)
-
-	// Ensure min <= estimated <= max
-	if est.EstimatedSizeMin > est.EstimatedSize {
-		est.EstimatedSizeMin = est.EstimatedSize
+	// Clamp compression ratio to reasonable bounds
+	if compressionRatio < 0.10 {
+		compressionRatio = 0.10 // At least 10% of original
 	}
-	if est.EstimatedSizeMax < est.EstimatedSize {
-		est.EstimatedSizeMax = est.EstimatedSize
+	if compressionRatio > 1.05 {
+		compressionRatio = 1.05 // Could be slightly larger due to overhead
+	}
+
+	// Account for non-video streams (audio, subtitles) which are copied unchanged
+	// The compression ratio only applies to the video portion
+	// Final size = (video_size * compression_ratio) + non_video_size
+	// Simplified: final_ratio = compression_ratio * (1 - overhead) + overhead
+	adjustedRatio := compressionRatio*(1-nonVideoOverheadRatio) + nonVideoOverheadRatio
+
+	// Calculate estimated sizes with uncertainty range
+	// Use larger uncertainty for hardware encoders (less predictable)
+	uncertainty := estimateUncertaintySoftware
+	if preset.Encoder != HWAccelNone {
+		uncertainty = estimateUncertaintyHardware
+	}
+
+	est.EstimatedSize = int64(float64(probe.Size) * adjustedRatio)
+	est.EstimatedSizeMin = int64(float64(est.EstimatedSize) * (1 - uncertainty))
+	est.EstimatedSizeMax = int64(float64(est.EstimatedSize) * (1 + uncertainty))
+
+	// Don't estimate larger than original for max (unless already HEVC)
+	if est.EstimatedSizeMax > probe.Size && !probe.IsHEVC {
+		est.EstimatedSizeMax = probe.Size
 	}
 
 	// Calculate savings
@@ -103,18 +143,42 @@ func EstimateTranscode(probe *ProbeResult, preset *Preset) *Estimate {
 		est.SavingsPercent = float64(est.SpaceSaved) / float64(probe.Size) * 100
 	}
 
+	// Add warning for low bitrate sources
+	if probe.Bitrate > 0 && probe.Bitrate < 2_000_000 && est.Warning == "" {
+		est.Warning = "Source has low bitrate. Transcoding may not save much space."
+	}
+
 	// Check for low savings warning
 	if est.SavingsPercent < 20 && est.Warning == "" {
 		est.Warning = "Estimated savings are less than 20%. This content may already be well-compressed."
 	}
 
-	// Estimate time: assume 0.5x to 1x realtime for software encoding
-	// Use 0.75x as middle ground (more conservative than optimistic)
-	// Time = duration / speed
-	encodeSpeed := 0.75 // Conservative estimate
-	est.EstimatedTime = time.Duration(float64(probe.Duration) / encodeSpeed)
+	// Estimate encoding time based on encoder type
+	est.EstimatedTime = estimateEncodeTime(probe.Duration, preset.Encoder)
 
 	return est
+}
+
+// estimateEncodeTime estimates how long encoding will take
+func estimateEncodeTime(duration time.Duration, encoder HWAccel) time.Duration {
+	// Encode speeds vary significantly by encoder
+	// These are conservative estimates (actual may be faster)
+	var encodeSpeed float64
+
+	switch encoder {
+	case HWAccelVideoToolbox:
+		encodeSpeed = 3.0 // ~3x realtime on Apple Silicon
+	case HWAccelNVENC:
+		encodeSpeed = 4.0 // ~4x realtime typical
+	case HWAccelQSV:
+		encodeSpeed = 3.0 // ~3x realtime typical
+	case HWAccelVAAPI:
+		encodeSpeed = 2.5 // ~2.5x realtime typical
+	default:
+		encodeSpeed = 0.5 // Software encoding: ~0.5x realtime (conservative)
+	}
+
+	return time.Duration(float64(duration) / encodeSpeed)
 }
 
 // EstimateMultiple estimates totals for multiple files

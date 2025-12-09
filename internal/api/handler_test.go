@@ -48,7 +48,7 @@ func setupTestHandler(t *testing.T) (*Handler, string) {
 	queue, _ := jobs.NewQueue("")
 	pool := jobs.NewWorkerPool(queue, cfg, nil)
 
-	handler := NewHandler(browser, queue, pool, cfg)
+	handler := NewHandler(browser, queue, pool, cfg, "")
 
 	return handler, tmpDir
 }

@@ -19,15 +19,17 @@ type Handler struct {
 	queue      *jobs.Queue
 	workerPool *jobs.WorkerPool
 	cfg        *config.Config
+	cfgPath    string
 }
 
 // NewHandler creates a new API handler
-func NewHandler(browser *browse.Browser, queue *jobs.Queue, workerPool *jobs.WorkerPool, cfg *config.Config) *Handler {
+func NewHandler(browser *browse.Browser, queue *jobs.Queue, workerPool *jobs.WorkerPool, cfg *config.Config, cfgPath string) *Handler {
 	return &Handler{
 		browser:    browser,
 		queue:      queue,
 		workerPool: workerPool,
 		cfg:        cfg,
+		cfgPath:    cfgPath,
 	}
 }
 
@@ -311,8 +313,19 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Workers > 0 {
-		h.cfg.Workers = req.Workers
-		// Note: changing workers doesn't restart the worker pool - would need app restart
+		if req.Workers > 6 {
+			req.Workers = 6 // Cap at 6 workers
+		}
+		// Dynamically resize the worker pool
+		h.workerPool.Resize(req.Workers)
+	}
+
+	// Persist config to disk
+	if h.cfgPath != "" {
+		if err := h.cfg.Save(h.cfgPath); err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to save config: %v", err))
+			return
+		}
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})

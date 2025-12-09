@@ -677,3 +677,160 @@ Initial commit: `c4d8dcc` - "Initial commit - Shrinkray video transcoding tool"
 ---
 
 *End of development log for December 7-8, 2025 session*
+
+---
+
+# Development Log - December 8, 2025 (Session 2)
+
+This section documents the second development session.
+
+## Session Summary
+
+In this session, we made several improvements to the MVP: fixed file handling behavior, improved estimation accuracy, added a settings UI, and implemented dynamic worker pool resizing.
+
+## Changes Made
+
+### 1. Fixed Keep/Replace File Handling
+
+**Problem:** The original logic was backwards - "replace" was keeping `.old` files and "keep" wasn't.
+
+**Solution:** Updated `FinalizeTranscode()` in `internal/ffmpeg/transcode.go`:
+
+| Mode | New Behavior |
+|------|--------------|
+| **Replace** | Deletes original file, creates new `.mkv` |
+| **Keep** | Renames original to `.old`, creates new `.mkv` |
+
+### 2. Improved Estimation Accuracy
+
+**Problem:** Estimates were outside the predicted range for hardware-encoded files.
+
+**Root Causes:**
+- Audio/subtitle streams are copied unchanged (not accounted for)
+- Hardware encoders are less predictable than software
+- Bitrate from ffprobe includes all streams, not just video
+
+**Solution:** Updated `internal/ffmpeg/estimate.go`:
+- Added `nonVideoOverheadRatio = 0.15` (15% of file is audio/subs)
+- Increased uncertainty for hardware encoders: ±35% vs ±20% for software
+- Estimation formula now: `final_ratio = compression_ratio * (1 - overhead) + overhead`
+- Added encoder-specific time estimates (HW encoders are faster)
+
+### 3. Settings UI
+
+**Added:** In-app settings panel that persists to YAML config.
+
+**Settings available:**
+- **Original files:** Replace (delete) / Keep (rename to .old)
+- **Concurrent jobs:** 1-6 workers
+
+**Implementation:**
+- New Settings card in `web/templates/index.html`
+- `loadSettings()` fetches `GET /api/config` on page load
+- `updateSetting()` sends `PUT /api/config` on change
+- Handler saves config to disk via `cfg.Save(cfgPath)`
+
+### 4. Dynamic Worker Pool Resizing
+
+**Problem:** Changing worker count required app restart.
+
+**Solution:** Added `Resize(n int)` method to WorkerPool:
+
+**Increasing workers:**
+- New workers created and started immediately
+
+**Decreasing workers:**
+- Jobs cancelled in reverse order (most recently added first)
+- Workers stopped immediately (no waiting for current job)
+- Uses job ID sorting (timestamp-based IDs = newer jobs have higher IDs)
+
+**Key code in `internal/jobs/worker.go`:**
+```go
+// Sort running jobs by job ID descending (newest first)
+sort.Slice(runningJobs, func(i, j int) bool {
+    return runningJobs[i].jobID > runningJobs[j].jobID
+})
+```
+
+### 5. "Initializing" State for Jobs
+
+**Problem:** Jobs showed 0% progress with "Speed: 0.00x" while ffmpeg was starting up, which looked broken.
+
+**Solution:** Added visual "initializing" state:
+- Detects: `job.status === 'running' && job.progress === 0 && job.speed === 0`
+- Shows "INITIALIZING" badge (purple/indigo)
+- Progress bar fills 100% with shimmering animation
+- Details show "Starting encoder..." instead of zeros
+
+**CSS animation:**
+```css
+.progress-fill.initializing {
+    background: linear-gradient(90deg, #c7d2fe 0%, #818cf8 50%, #c7d2fe 100%);
+    background-size: 200% 100%;
+    animation: shimmer 2.5s ease-in-out infinite;
+}
+```
+
+## Files Modified
+
+### `internal/ffmpeg/transcode.go`
+- Fixed `FinalizeTranscode()` keep/replace logic
+
+### `internal/ffmpeg/estimate.go`
+- Added audio overhead compensation
+- Added encoder-specific uncertainty ranges
+- Added `estimateEncodeTime()` function with per-encoder speeds
+
+### `internal/jobs/worker.go`
+- Added `sync.Mutex` to WorkerPool for thread safety
+- Added `Resize(n int)` method
+- Added `WorkerCount()` method
+- Added `CancelAndStop()` method to Worker
+- Jobs cancelled in reverse order (LIFO) when reducing workers
+
+### `internal/api/handler.go`
+- Added `cfgPath` field to Handler
+- `UpdateConfig` now calls `workerPool.Resize()` and saves to disk
+- Updated `NewHandler` signature to accept config path
+
+### `cmd/shrinkray/main.go`
+- Pass `cfgPath` to `api.NewHandler()`
+
+### `web/templates/index.html`
+- Added Settings card with dropdowns
+- Added `loadSettings()` and `updateSetting()` functions
+- Added "initializing" state with shimmer animation
+- Worker options: 1-6 (was 1-4)
+
+### Test Files Updated
+- `internal/ffmpeg/transcode_test.go` - Updated for new keep/replace behavior
+- `internal/api/handler_test.go` - Updated NewHandler call
+- `internal/jobs/worker_test.go` - Added `TestWorkerPoolResize`, `TestWorkerPoolResizeDown`
+
+## Configuration
+
+Max workers changed from 4 → 6 across:
+- `worker.go` Resize() bounds
+- `handler.go` API validation
+- `index.html` dropdown options
+
+## Known Issues Resolved
+
+From previous session's list:
+- ✅ **No config UI** - Now has Settings panel
+- ✅ **Estimate accuracy** - Improved with audio overhead + encoder-specific uncertainty
+
+Still outstanding:
+- UI still labeled "Debug UI"
+- `.old` files need manual cleanup
+- Job history could be improved
+
+## API Changes
+
+`PUT /api/config` now:
+- Dynamically resizes worker pool (no restart needed)
+- Persists changes to YAML file
+
+---
+
+*End of development log for December 8, 2025 (Session 2)*

@@ -175,3 +175,78 @@ func TestWorkerPoolCancel(t *testing.T) {
 
 	t.Log("Worker pool start/stop works correctly")
 }
+
+func TestWorkerPoolResize(t *testing.T) {
+	cfg := &config.Config{
+		Workers:     1,
+		FFmpegPath:  "ffmpeg",
+		FFprobePath: "ffprobe",
+	}
+
+	queue, _ := NewQueue("")
+	pool := NewWorkerPool(queue, cfg, nil)
+	pool.Start()
+	defer pool.Stop()
+
+	// Initial count should be 1
+	if pool.WorkerCount() != 1 {
+		t.Errorf("expected 1 worker, got %d", pool.WorkerCount())
+	}
+
+	// Increase to 3
+	pool.Resize(3)
+	if pool.WorkerCount() != 3 {
+		t.Errorf("expected 3 workers after resize up, got %d", pool.WorkerCount())
+	}
+	if cfg.Workers != 3 {
+		t.Errorf("expected config.Workers to be 3, got %d", cfg.Workers)
+	}
+
+	// Decrease to 2 - should happen immediately (synchronously)
+	pool.Resize(2)
+	if pool.WorkerCount() != 2 {
+		t.Errorf("expected 2 workers after resize down, got %d", pool.WorkerCount())
+	}
+
+	// Test bounds - minimum 1
+	pool.Resize(0)
+	if pool.WorkerCount() != 1 {
+		t.Errorf("expected 1 worker (minimum), got %d", pool.WorkerCount())
+	}
+
+	// Test bounds - maximum 6
+	pool.Resize(20)
+	if pool.WorkerCount() != 6 {
+		t.Errorf("expected 6 workers (maximum), got %d", pool.WorkerCount())
+	}
+
+	t.Logf("Worker pool resize works correctly, final count: %d", pool.WorkerCount())
+}
+
+func TestWorkerPoolResizeDown(t *testing.T) {
+	// Test that resize down is immediate and doesn't block
+	cfg := &config.Config{
+		Workers:     4,
+		FFmpegPath:  "ffmpeg",
+		FFprobePath: "ffprobe",
+	}
+
+	queue, _ := NewQueue("")
+	pool := NewWorkerPool(queue, cfg, nil)
+	pool.Start()
+	defer pool.Stop()
+
+	if pool.WorkerCount() != 4 {
+		t.Errorf("expected 4 workers, got %d", pool.WorkerCount())
+	}
+
+	// Resize down should complete immediately (not wait for jobs)
+	pool.Resize(1)
+
+	// Should be 1 immediately after Resize returns
+	if pool.WorkerCount() != 1 {
+		t.Errorf("expected 1 worker immediately after resize, got %d", pool.WorkerCount())
+	}
+
+	t.Log("Resize down is immediate")
+}

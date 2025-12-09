@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"sync"
 	"time"
 
@@ -35,10 +36,12 @@ type Worker struct {
 
 // WorkerPool manages multiple workers
 type WorkerPool struct {
+	mu              sync.Mutex
 	workers         []*Worker
 	queue           *Queue
 	cfg             *config.Config
 	invalidateCache CacheInvalidator
+	nextWorkerID    int
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -53,28 +56,38 @@ func NewWorkerPool(queue *Queue, cfg *config.Config, invalidateCache CacheInvali
 		queue:           queue,
 		cfg:             cfg,
 		invalidateCache: invalidateCache,
+		nextWorkerID:    0,
 		ctx:             ctx,
 		cancel:          cancel,
 	}
 
 	// Create workers
 	for i := 0; i < cfg.Workers; i++ {
-		worker := &Worker{
-			id:              i,
-			queue:           queue,
-			transcoder:      ffmpeg.NewTranscoder(cfg.FFmpegPath),
-			prober:          ffmpeg.NewProber(cfg.FFprobePath),
-			cfg:             cfg,
-			invalidateCache: invalidateCache,
-		}
-		pool.workers = append(pool.workers, worker)
+		pool.workers = append(pool.workers, pool.createWorker())
 	}
 
 	return pool
 }
 
+// createWorker creates a new worker with the next available ID
+func (p *WorkerPool) createWorker() *Worker {
+	worker := &Worker{
+		id:              p.nextWorkerID,
+		queue:           p.queue,
+		transcoder:      ffmpeg.NewTranscoder(p.cfg.FFmpegPath),
+		prober:          ffmpeg.NewProber(p.cfg.FFprobePath),
+		cfg:             p.cfg,
+		invalidateCache: p.invalidateCache,
+	}
+	p.nextWorkerID++
+	return worker
+}
+
 // Start starts all workers
 func (p *WorkerPool) Start() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	for _, w := range p.workers {
 		w.Start(p.ctx)
 	}
@@ -83,19 +96,120 @@ func (p *WorkerPool) Start() {
 // Stop stops all workers gracefully
 func (p *WorkerPool) Stop() {
 	p.cancel()
-	for _, w := range p.workers {
+
+	p.mu.Lock()
+	workers := make([]*Worker, len(p.workers))
+	copy(workers, p.workers)
+	p.mu.Unlock()
+
+	for _, w := range workers {
 		w.Stop()
 	}
 }
 
 // CancelJob cancels a specific job if it's currently running
 func (p *WorkerPool) CancelJob(jobID string) bool {
-	for _, w := range p.workers {
+	p.mu.Lock()
+	workers := make([]*Worker, len(p.workers))
+	copy(workers, p.workers)
+	p.mu.Unlock()
+
+	for _, w := range workers {
 		if w.CancelCurrentJob(jobID) {
 			return true
 		}
 	}
 	return false
+}
+
+// Resize changes the number of workers in the pool
+// If n > current, new workers are started immediately
+// If n < current, excess workers are stopped immediately
+// Jobs are cancelled in reverse order (most recently added jobs cancelled first)
+func (p *WorkerPool) Resize(n int) {
+	if n < 1 {
+		n = 1
+	}
+	if n > 6 {
+		n = 6 // reasonable upper limit
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	current := len(p.workers)
+
+	if n > current {
+		// Add workers
+		for i := current; i < n; i++ {
+			worker := p.createWorker()
+			worker.Start(p.ctx)
+			p.workers = append(p.workers, worker)
+		}
+	} else if n < current {
+		// Remove excess workers immediately
+		// Cancel jobs in reverse order (most recently added jobs first)
+		workersToStop := current - n
+
+		// First, collect all running jobs and their workers
+		type runningJob struct {
+			worker *Worker
+			jobID  string
+		}
+		var runningJobs []runningJob
+
+		for _, w := range p.workers {
+			w.currentJobMu.Lock()
+			if w.currentJob != nil {
+				runningJobs = append(runningJobs, runningJob{
+					worker: w,
+					jobID:  w.currentJob.ID,
+				})
+			}
+			w.currentJobMu.Unlock()
+		}
+
+		// Sort running jobs by job ID descending (newest first)
+		// Job IDs are timestamp-based, so lexicographically larger = more recent
+		sort.Slice(runningJobs, func(i, j int) bool {
+			return runningJobs[i].jobID > runningJobs[j].jobID
+		})
+
+		// Cancel jobs starting from most recent
+		cancelled := 0
+		for _, rj := range runningJobs {
+			if cancelled >= workersToStop {
+				break
+			}
+			rj.worker.CancelAndStop()
+
+			// Remove this worker from the pool
+			for j, w := range p.workers {
+				if w == rj.worker {
+					p.workers = append(p.workers[:j], p.workers[j+1:]...)
+					break
+				}
+			}
+			cancelled++
+		}
+
+		// If we still need to remove more workers (idle ones), remove from end
+		for len(p.workers) > n {
+			w := p.workers[len(p.workers)-1]
+			p.workers = p.workers[:len(p.workers)-1]
+			w.CancelAndStop()
+		}
+	}
+
+	// Update config
+	p.cfg.Workers = n
+}
+
+// WorkerCount returns the current number of workers
+func (p *WorkerPool) WorkerCount() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return len(p.workers)
 }
 
 // Start starts the worker's processing loop
@@ -235,6 +349,19 @@ func (w *Worker) CancelCurrentJob(jobID string) bool {
 		return true
 	}
 	return false
+}
+
+// CancelAndStop cancels any current job and stops the worker immediately
+func (w *Worker) CancelAndStop() {
+	// First cancel any running job
+	w.currentJobMu.Lock()
+	if w.jobCancel != nil {
+		w.jobCancel()
+	}
+	w.currentJobMu.Unlock()
+
+	// Then stop the worker
+	w.Stop()
 }
 
 // formatDuration formats a duration as a human-readable string

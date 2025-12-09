@@ -205,6 +205,7 @@
         .job-status.complete { background: #d4edda; color: #155724; }
         .job-status.failed { background: #f8d7da; color: #721c24; }
         .job-status.cancelled { background: #e2e3e5; color: #383d41; }
+        .job-status.initializing { background: #e0e7ff; color: #3730a3; }
         .encoder-badge { margin-left: 8px; }
         .encoder-badge.hardware { background: #d4edda; color: #155724; }
         .encoder-badge.software { background: #f8d7da; color: #721c24; }
@@ -219,6 +220,15 @@
             height: 100%;
             background: #0071e3;
             transition: width 0.3s ease;
+        }
+        .progress-fill.initializing {
+            background: linear-gradient(90deg, #c7d2fe 0%, #818cf8 50%, #c7d2fe 100%);
+            background-size: 200% 100%;
+            animation: shimmer 2.5s ease-in-out infinite;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
         }
         .job-details {
             display: flex;
@@ -265,6 +275,46 @@
             overflow-y: auto;
             white-space: pre-wrap;
             word-break: break-all;
+        }
+        .settings-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #e5e5e5;
+        }
+        .setting-row:last-child {
+            border-bottom: none;
+        }
+        .setting-label {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .setting-name {
+            font-weight: 500;
+            color: #1d1d1f;
+        }
+        .setting-description {
+            font-size: 0.875rem;
+            color: #86868b;
+        }
+        .setting-control select {
+            min-width: 200px;
+        }
+        .settings-status {
+            margin-top: 10px;
+            font-size: 0.875rem;
+            color: #34c759;
+            min-height: 20px;
+        }
+        .settings-status.error {
+            color: #ff3b30;
         }
     </style>
 </head>
@@ -330,6 +380,41 @@
             <button onclick="clearCompleted()" class="secondary">Clear Completed</button>
             <button onclick="refreshJobs()">Refresh</button>
         </div>
+    </div>
+
+    <div class="card">
+        <h2>Settings</h2>
+        <div class="settings-grid" id="settings">
+            <div class="setting-row">
+                <div class="setting-label">
+                    <span class="setting-name">Original files</span>
+                    <span class="setting-description">What happens to source files after transcoding</span>
+                </div>
+                <div class="setting-control">
+                    <select id="setting-original-handling" onchange="updateSetting('original_handling', this.value)">
+                        <option value="replace">Replace (delete original)</option>
+                        <option value="keep">Keep (rename to .old)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="setting-row">
+                <div class="setting-label">
+                    <span class="setting-name">Concurrent jobs</span>
+                    <span class="setting-description">Number of files to transcode simultaneously</span>
+                </div>
+                <div class="setting-control">
+                    <select id="setting-workers" onchange="updateSetting('workers', parseInt(this.value))">
+                        <option value="1">1 (recommended)</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div id="settings-status" class="settings-status"></div>
     </div>
 
     <div class="card">
@@ -638,27 +723,30 @@
                 const filename = job.input_path.split('/').pop();
                 const encoderClass = job.is_hardware ? 'hardware' : 'software';
                 const encoderLabel = job.is_hardware ? 'Hardware' : 'Software';
+                const isInitializing = job.status === 'running' && job.progress === 0 && job.speed === 0;
                 return `
                     <div class="job">
                         <div class="job-header">
                             <span class="job-path" title="${job.input_path}">${filename}</span>
                             <span>
                                 <span class="encoder-badge ${encoderClass}">${encoderLabel}</span>
-                                <span class="job-status ${job.status}">${job.status}</span>
+                                <span class="job-status ${job.status}">${isInitializing ? 'initializing' : job.status}</span>
                             </span>
                         </div>
                         ${job.status === 'running' ? `
                             <div class="progress-bar">
-                                <div class="progress-fill" style="width: ${job.progress}%"></div>
+                                <div class="progress-fill ${isInitializing ? 'initializing' : ''}" style="width: ${isInitializing ? '100' : job.progress}%"></div>
                             </div>
                         ` : ''}
                         <div class="job-details">
                             <span>Preset: ${job.preset_id}</span>
-                            ${job.status === 'running' ? `
+                            ${job.status === 'running' ? (isInitializing ? `
+                                <span>Starting encoder...</span>
+                            ` : `
                                 <span>${job.progress.toFixed(1)}%</span>
                                 <span>Speed: ${job.speed.toFixed(2)}x</span>
                                 <span>ETA: ${job.eta || 'calculating...'}</span>
-                            ` : ''}
+                            `) : ''}
                             ${job.status === 'complete' ? `
                                 <span>Saved: ${formatBytes(job.space_saved)}</span>
                                 <span>${formatBytes(job.input_size)} → ${formatBytes(job.output_size)}</span>
@@ -714,9 +802,62 @@
             };
         }
 
+        // Settings functions
+        async function loadSettings() {
+            try {
+                const resp = await fetch('/api/config');
+                const config = await resp.json();
+
+                // Set original handling dropdown
+                const handlingSelect = document.getElementById('setting-original-handling');
+                handlingSelect.value = config.original_handling || 'replace';
+
+                // Set workers dropdown
+                const workersSelect = document.getElementById('setting-workers');
+                workersSelect.value = config.workers || 1;
+
+                log(`Settings loaded: original_handling=${config.original_handling}, workers=${config.workers}`);
+            } catch (err) {
+                log(`Error loading settings: ${err.message}`);
+            }
+        }
+
+        async function updateSetting(key, value) {
+            const statusEl = document.getElementById('settings-status');
+            try {
+                const body = {};
+                body[key] = value;
+
+                const resp = await fetch('/api/config', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+
+                if (!resp.ok) {
+                    const data = await resp.json();
+                    throw new Error(data.error || 'Failed to update');
+                }
+
+                statusEl.textContent = 'Settings saved';
+                statusEl.className = 'settings-status';
+                log(`Setting updated: ${key}=${value}`);
+
+                // Clear status after 2 seconds
+                setTimeout(() => {
+                    statusEl.textContent = '';
+                }, 2000);
+            } catch (err) {
+                statusEl.textContent = `Error: ${err.message}`;
+                statusEl.className = 'settings-status error';
+                log(`Error updating setting: ${err.message}`);
+            }
+        }
+
         // Initialize
         browse();
         connectSSE();
+        loadSettings();
 
         // Load presets
         async function loadPresets() {

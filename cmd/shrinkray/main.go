@@ -119,7 +119,7 @@ func main() {
 	workerPool := jobs.NewWorkerPool(queue, cfg, browser.InvalidateCache)
 
 	// Create API handler
-	handler := api.NewHandler(browser, queue, workerPool, cfg)
+	handler := api.NewHandler(browser, queue, workerPool, cfg, cfgPath)
 	router := api.NewRouter(handler, shrinkray.WebFS)
 
 	// Start worker pool
