@@ -7,7 +7,8 @@ import (
 )
 
 // NewRouter creates a new HTTP router with all API endpoints
-func NewRouter(h *Handler, staticFS embed.FS) *http.ServeMux {
+// debugMode determines which UI to serve (true = debug UI, false = production UI)
+func NewRouter(h *Handler, staticFS embed.FS, debugMode bool) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// API routes
@@ -29,8 +30,14 @@ func NewRouter(h *Handler, staticFS embed.FS) *http.ServeMux {
 	mux.HandleFunc("GET /api/stats", h.Stats)
 	mux.HandleFunc("POST /api/cache/clear", h.ClearCache)
 
-	// Serve static files from web/templates
-	staticSubFS, err := fs.Sub(staticFS, "web/templates")
+	// Determine which UI to serve
+	uiPath := "web/templates"
+	if debugMode {
+		uiPath = "web/debug"
+	}
+
+	// Serve static files from appropriate directory
+	staticSubFS, err := fs.Sub(staticFS, uiPath)
 	if err != nil {
 		// Fall back to empty handler if no static files
 		mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {

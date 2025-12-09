@@ -23,6 +23,7 @@ func main() {
 	configPath := flag.String("config", "", "Path to config file (default: ./config/shrinkray.yaml)")
 	port := flag.Int("port", 8080, "Port to listen on")
 	mediaPath := flag.String("media", "", "Override media path from config")
+	debugUI := flag.Bool("debug", false, "Use debug UI instead of production UI")
 	flag.Parse()
 
 	// Determine config path
@@ -120,12 +121,17 @@ func main() {
 
 	// Create API handler
 	handler := api.NewHandler(browser, queue, workerPool, cfg, cfgPath)
-	router := api.NewRouter(handler, shrinkray.WebFS)
+	router := api.NewRouter(handler, shrinkray.WebFS, *debugUI)
 
 	// Start worker pool
 	workerPool.Start()
 	defer workerPool.Stop()
 
+	uiMode := "production"
+	if *debugUI {
+		uiMode = "debug"
+	}
+	fmt.Printf("  UI mode:      %s\n", uiMode)
 	fmt.Printf("  Starting server on http://localhost:%d\n", *port)
 	fmt.Println()
 	fmt.Println("  Press Ctrl+C to stop")

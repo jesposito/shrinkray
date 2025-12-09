@@ -3,439 +3,1125 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shrinkray - Debug UI</title>
+    <title>Shrinkray</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg-primary: #FAFAFA;
+            --bg-secondary: #FFFFFF;
+            --bg-tertiary: #F5F5F5;
+            --text-primary: #1A1A1A;
+            --text-secondary: #6B6B6B;
+            --text-tertiary: #9A9A9A;
+            --accent: #2563EB;
+            --accent-hover: #1D4ED8;
+            --accent-light: #EFF6FF;
+            --success: #059669;
+            --success-light: #ECFDF5;
+            --warning: #D97706;
+            --warning-light: #FFFBEB;
+            --error: #DC2626;
+            --error-light: #FEF2F2;
+            --border: #E5E5E5;
+            --border-hover: #D4D4D4;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+            --shadow-lg: 0 12px 32px rgba(0,0,0,0.12);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 24px;
+            --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --transition-fast: 150ms ease;
+            --transition-normal: 250ms ease;
+        }
+
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
         }
+
+        html {
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            line-height: 1.6;
-            padding: 20px;
-            max-width: 1200px;
-            margin: 0 auto;
-            background: #f5f5f7;
-            color: #1d1d1f;
+            font-family: var(--font-sans);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
         }
-        h1, h2, h3 {
-            font-weight: 600;
+
+        /* Layout */
+        .app {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
         }
-        h1 {
-            margin-bottom: 20px;
-            color: #1d1d1f;
-        }
-        h2 {
-            margin: 30px 0 15px;
-            color: #1d1d1f;
-            font-size: 1.25rem;
-        }
-        .card {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 15px;
-        }
-        .stat {
-            text-align: center;
-            padding: 15px;
-            background: #f5f5f7;
-            border-radius: 8px;
-        }
-        .stat-value {
-            font-size: 2rem;
-            font-weight: 600;
-            color: #0071e3;
-        }
-        .stat-label {
-            font-size: 0.875rem;
-            color: #86868b;
-        }
-        .file-list {
-            list-style: none;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        .file-item {
-            padding: 10px 15px;
-            border-bottom: 1px solid #e5e5e5;
+
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 0 24px;
+            height: 64px;
             display: flex;
             align-items: center;
-            cursor: pointer;
-            text-align: left;
-            gap: 12px;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
-        .file-name {
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            font-size: 1.125rem;
+            letter-spacing: -0.02em;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--accent) 0%, #7C3AED 100%);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1rem;
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 24px;
+            margin-left: 40px;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stat-value {
+            font-weight: 600;
+            font-size: 0.9375rem;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .stat-label {
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+        }
+
+        .stat-item.success .stat-value { color: var(--success); }
+        .stat-item.running .stat-value { color: var(--accent); }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .menu-btn {
+            width: 40px;
+            height: 40px;
+            border: none;
+            background: transparent;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            transition: all var(--transition-fast);
+        }
+
+        .menu-btn:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .menu-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .main {
+            flex: 1;
+            display: flex;
+            max-width: 1600px;
+            margin: 0 auto;
+            width: 100%;
+            padding: 24px;
+            gap: 24px;
+        }
+
+        /* Browser Panel */
+        .browser-panel {
             flex: 1;
             min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .panel {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
             overflow: hidden;
-            text-overflow: ellipsis;
+        }
+
+        .panel-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .panel-title {
+            font-weight: 600;
+            font-size: 0.9375rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            padding: 12px 20px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border);
+            overflow-x: auto;
             white-space: nowrap;
         }
-        .file-item:hover {
-            background: #f5f5f7;
+
+        .breadcrumb a {
+            color: var(--accent);
+            text-decoration: none;
+            transition: color var(--transition-fast);
         }
-        .file-item:last-child {
-            border-bottom: none;
+
+        .breadcrumb a:hover {
+            color: var(--accent-hover);
         }
-        .file-item.dir .file-name {
+
+        .breadcrumb-sep {
+            color: var(--text-tertiary);
+            margin: 0 4px;
+        }
+
+        .breadcrumb-current {
+            color: var(--text-primary);
             font-weight: 500;
         }
-        .file-item.selected {
-            background: #e8f4ff;
+
+        .file-list {
+            list-style: none;
+            max-height: calc(100vh - 420px);
+            min-height: 300px;
+            overflow-y: auto;
         }
-        .file-meta {
-            color: #86868b;
-            font-size: 0.875rem;
-            flex-shrink: 0;
-            text-align: right;
-        }
-        .file-checkbox {
-            width: 18px;
-            height: 18px;
-            cursor: pointer;
-            flex-shrink: 0;
-        }
-        .file-icon {
-            flex-shrink: 0;
-            width: 20px;
-            text-align: center;
-        }
+
         .file-list-header {
             display: flex;
             align-items: center;
-            padding: 10px 15px;
-            background: #f5f5f7;
-            border-bottom: 1px solid #e5e5e5;
+            padding: 10px 20px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border);
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
             gap: 12px;
-            font-size: 0.875rem;
-            color: #86868b;
+            position: sticky;
+            top: 0;
+            z-index: 1;
         }
+
         .file-list-header label {
             display: flex;
             align-items: center;
             gap: 8px;
             cursor: pointer;
+            user-select: none;
         }
-        .breadcrumb {
-            margin-bottom: 15px;
-            color: #86868b;
-        }
-        .breadcrumb a {
-            color: #0071e3;
-            text-decoration: none;
-        }
-        .breadcrumb a:hover {
-            text-decoration: underline;
-        }
-        button {
-            background: #0071e3;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border);
             cursor: pointer;
-            font-size: 1rem;
-            font-weight: 500;
+            transition: background var(--transition-fast);
+            gap: 12px;
         }
-        button:hover {
-            background: #0077ed;
+
+        .file-item:hover {
+            background: var(--bg-tertiary);
         }
-        button:disabled {
-            background: #86868b;
-            cursor: not-allowed;
-        }
-        button.secondary {
-            background: #e5e5e5;
-            color: #1d1d1f;
-        }
-        button.secondary:hover {
-            background: #d5d5d5;
-        }
-        button.danger {
-            background: #ff3b30;
-        }
-        button.danger:hover {
-            background: #ff4d42;
-        }
-        select {
-            padding: 10px 15px;
-            border: 1px solid #d2d2d7;
-            border-radius: 8px;
-            font-size: 1rem;
-            background: white;
-        }
-        .job {
-            padding: 15px;
-            border-bottom: 1px solid #e5e5e5;
-        }
-        .job:last-child {
+
+        .file-item:last-child {
             border-bottom: none;
         }
-        .job-header {
+
+        .file-item.selected {
+            background: var(--accent-light);
+        }
+
+        .file-item.selected:hover {
+            background: #DBEAFE;
+        }
+
+        .file-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: var(--accent);
+            flex-shrink: 0;
+        }
+
+        .file-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 1rem;
+        }
+
+        .file-icon.folder {
+            background: #FEF3C7;
+            color: #D97706;
+        }
+
+        .file-icon.video {
+            background: var(--accent-light);
+            color: var(--accent);
+        }
+
+        .file-icon.other {
+            background: var(--bg-tertiary);
+            color: var(--text-tertiary);
+        }
+
+        .file-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .file-name {
+            font-weight: 500;
+            font-size: 0.9375rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .file-meta {
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+            margin-top: 2px;
+            display: flex;
+            gap: 12px;
+        }
+
+        .file-size {
+            font-variant-numeric: tabular-nums;
+            color: var(--text-tertiary);
+            font-size: 0.8125rem;
+            flex-shrink: 0;
+        }
+
+        .codec-badge {
+            display: inline-flex;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+
+        .codec-badge.hevc {
+            background: var(--success-light);
+            color: var(--success);
+        }
+
+        .codec-badge.h264 {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+        }
+
+        .file-list-empty {
+            padding: 60px 20px;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        /* Actions Bar */
+        .actions-bar {
+            display: flex;
+            gap: 12px;
+            padding: 16px 20px;
+            background: var(--bg-tertiary);
+            border-top: 1px solid var(--border);
+            align-items: center;
+        }
+
+        .preset-select {
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 0.875rem;
+            font-family: var(--font-sans);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            cursor: pointer;
+            min-width: 200px;
+            transition: border-color var(--transition-fast);
+        }
+
+        .preset-select:hover {
+            border-color: var(--border-hover);
+        }
+
+        .preset-select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 18px;
+            border-radius: var(--radius-sm);
+            font-size: 0.875rem;
+            font-weight: 500;
+            font-family: var(--font-sans);
+            cursor: pointer;
+            border: none;
+            transition: all var(--transition-fast);
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        .btn-primary:disabled {
+            background: var(--border);
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--border-hover);
+        }
+
+        .btn-danger {
+            background: var(--error);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #B91C1C;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.8125rem;
+        }
+
+        .selection-count {
+            margin-left: auto;
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+        }
+
+        /* Estimate Panel */
+        .estimate-panel {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .estimate-content {
+            padding: 20px;
+        }
+
+        .estimate-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
+            padding: 8px 0;
         }
-        .job-path {
+
+        .estimate-label {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .estimate-value {
             font-weight: 500;
-            word-break: break-all;
+            font-variant-numeric: tabular-nums;
         }
-        .job-status, .encoder-badge {
-            display: inline-block;
-            min-width: 80px;
-            padding: 4px 8px;
+
+        .estimate-value.savings {
+            color: var(--success);
+            font-size: 1.125rem;
+        }
+
+        .estimate-range {
+            font-size: 0.8125rem;
+            color: var(--text-tertiary);
+        }
+
+        .estimate-warning {
+            background: var(--warning-light);
+            color: var(--warning);
+            padding: 12px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 0.875rem;
+            margin-top: 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .estimate-close {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: transparent;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-tertiary);
+            transition: all var(--transition-fast);
+        }
+
+        .estimate-close:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        /* Queue Panel */
+        .queue-panel {
+            width: 400px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            min-height: 0;
+        }
+
+        .queue-panel-inner {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .queue-list {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 100px;
+        }
+
+        .job-item {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .job-item:last-child {
+            border-bottom: none;
+        }
+
+        .job-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .job-name {
+            font-weight: 500;
+            font-size: 0.9375rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .job-badges {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .job-badge {
+            display: inline-flex;
+            padding: 3px 8px;
             border-radius: 4px;
-            font-size: 0.7rem;
+            font-size: 0.6875rem;
             font-weight: 600;
             text-transform: uppercase;
-            text-align: center;
-            box-sizing: border-box;
+            letter-spacing: 0.02em;
         }
-        .job-status.pending { background: #f5f5f7; color: #86868b; }
-        .job-status.running { background: #fff3cd; color: #856404; }
-        .job-status.complete { background: #d4edda; color: #155724; }
-        .job-status.failed { background: #f8d7da; color: #721c24; }
-        .job-status.cancelled { background: #e2e3e5; color: #383d41; }
-        .job-status.initializing { background: #e0e7ff; color: #3730a3; }
-        .encoder-badge { margin-left: 8px; }
-        .encoder-badge.hardware { background: #d4edda; color: #155724; }
-        .encoder-badge.software { background: #f8d7da; color: #721c24; }
+
+        .job-badge.pending {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+        }
+
+        .job-badge.running {
+            background: var(--accent-light);
+            color: var(--accent);
+        }
+
+        .job-badge.complete {
+            background: var(--success-light);
+            color: var(--success);
+        }
+
+        .job-badge.failed {
+            background: var(--error-light);
+            color: var(--error);
+        }
+
+        .job-badge.initializing {
+            background: #F3E8FF;
+            color: #7C3AED;
+        }
+
+        .job-badge.hardware {
+            background: var(--success-light);
+            color: var(--success);
+        }
+
+        .job-badge.software {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+        }
+
+        .job-progress {
+            margin: 12px 0;
+        }
+
         .progress-bar {
-            height: 8px;
-            background: #e5e5e5;
-            border-radius: 4px;
+            height: 6px;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
             overflow: hidden;
-            margin: 10px 0;
         }
+
         .progress-fill {
             height: 100%;
-            background: #0071e3;
-            transition: width 0.3s ease;
+            background: var(--accent);
+            border-radius: 3px;
+            transition: width var(--transition-normal);
         }
+
         .progress-fill.initializing {
-            background: linear-gradient(90deg, #c7d2fe 0%, #818cf8 50%, #c7d2fe 100%);
+            background: linear-gradient(90deg, #DDD6FE 0%, #A78BFA 50%, #DDD6FE 100%);
             background-size: 200% 100%;
-            animation: shimmer 2.5s ease-in-out infinite;
+            animation: shimmer 2s ease-in-out infinite;
         }
+
         @keyframes shimmer {
             0% { background-position: 200% 0; }
             100% { background-position: -200% 0; }
         }
+
         .job-details {
             display: flex;
-            gap: 20px;
-            font-size: 0.875rem;
-            color: #86868b;
+            gap: 16px;
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+            margin-top: 8px;
         }
-        .controls {
+
+        .job-detail {
             display: flex;
-            gap: 10px;
-            margin-top: 15px;
-            flex-wrap: wrap;
+            align-items: center;
+            gap: 4px;
         }
-        .estimate {
-            background: #f5f5f7;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 15px 0;
+
+        .job-detail-value {
+            font-weight: 500;
+            font-variant-numeric: tabular-nums;
         }
-        .estimate-row {
+
+        .job-saved {
+            color: var(--success);
+        }
+
+        .job-error {
+            color: var(--error);
+            font-size: 0.8125rem;
+            margin-top: 8px;
+        }
+
+        .job-actions {
+            margin-top: 12px;
+        }
+
+        .queue-empty {
+            padding: 60px 20px;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        .queue-empty-icon {
+            font-size: 2rem;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+
+        .queue-footer {
+            padding: 12px 20px;
+            background: var(--bg-tertiary);
+            border-top: 1px solid var(--border);
             display: flex;
-            justify-content: space-between;
-            margin: 5px 0;
+            gap: 8px;
         }
-        .savings {
-            color: #34c759;
-            font-weight: 600;
+
+        /* Settings Menu */
+        .settings-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 200;
+            opacity: 0;
+            visibility: hidden;
+            transition: all var(--transition-normal);
         }
-        .warning {
-            background: #fff3cd;
-            color: #856404;
-            padding: 10px 15px;
-            border-radius: 8px;
-            margin: 10px 0;
+
+        .settings-overlay.open {
+            opacity: 1;
+            visibility: visible;
         }
-        #debug {
-            font-family: monospace;
-            font-size: 0.75rem;
-            background: #1d1d1f;
-            color: #00ff00;
-            padding: 15px;
-            border-radius: 8px;
-            max-height: 300px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-        .settings-grid {
+
+        .settings-panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 400px;
+            max-width: 100%;
+            background: var(--bg-secondary);
+            z-index: 201;
+            transform: translateX(100%);
+            transition: transform var(--transition-normal);
             display: flex;
             flex-direction: column;
-            gap: 15px;
         }
-        .setting-row {
+
+        .settings-overlay.open .settings-panel {
+            transform: translateX(0);
+        }
+
+        .settings-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .settings-title {
+            font-weight: 600;
+            font-size: 1.125rem;
+        }
+
+        .settings-close {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: transparent;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            transition: all var(--transition-fast);
+        }
+
+        .settings-close:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .settings-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+
+        .setting-group {
+            margin-bottom: 32px;
+        }
+
+        .setting-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .setting-group-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-tertiary);
+            margin-bottom: 16px;
+        }
+
+        .setting-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 10px 0;
-            border-bottom: 1px solid #e5e5e5;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
         }
-        .setting-row:last-child {
+
+        .setting-item:last-child {
             border-bottom: none;
         }
-        .setting-label {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
+
+        .setting-info {
+            flex: 1;
         }
+
         .setting-name {
             font-weight: 500;
-            color: #1d1d1f;
+            font-size: 0.9375rem;
+            margin-bottom: 2px;
         }
-        .setting-description {
+
+        .setting-desc {
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+        }
+
+        .setting-control {
+            margin-left: 16px;
+        }
+
+        .setting-select {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
             font-size: 0.875rem;
-            color: #86868b;
+            font-family: var(--font-sans);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            cursor: pointer;
+            min-width: 160px;
         }
-        .setting-control select {
-            min-width: 200px;
-        }
+
         .settings-status {
-            margin-top: 10px;
-            font-size: 0.875rem;
-            color: #34c759;
-            min-height: 20px;
+            padding: 12px 24px;
+            font-size: 0.8125rem;
+            color: var(--success);
+            min-height: 44px;
+            display: flex;
+            align-items: center;
         }
+
         .settings-status.error {
-            color: #ff3b30;
+            color: var(--error);
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .main {
+                flex-direction: column;
+            }
+
+            .queue-panel {
+                width: 100%;
+            }
+
+            .queue-list {
+                max-height: 400px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                padding: 0 16px;
+            }
+
+            .stats-bar {
+                display: none;
+            }
+
+            .main {
+                padding: 16px;
+            }
+
+            .settings-panel {
+                width: 100%;
+            }
+
+            .actions-bar {
+                flex-wrap: wrap;
+            }
+
+            .preset-select {
+                width: 100%;
+                min-width: 0;
+            }
+        }
+
+        /* Loading State */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 12px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Hidden utility */
+        .hidden {
+            display: none !important;
         }
     </style>
 </head>
 <body>
-    <h1>🔬 Shrinkray Debug UI</h1>
-
-    <div class="card">
-        <h2>Stats</h2>
-        <div class="stats" id="stats">
-            <div class="stat">
-                <div class="stat-value" id="stat-pending">0</div>
-                <div class="stat-label">Pending</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value" id="stat-running">0</div>
-                <div class="stat-label">Running</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value" id="stat-complete">0</div>
-                <div class="stat-label">Complete</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value" id="stat-failed">0</div>
-                <div class="stat-label">Failed</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value" id="stat-saved">0 MB</div>
-                <div class="stat-label">Saved</div>
-            </div>
-        </div>
-    </div>
-
-    <div class="card">
-        <h2>File Browser</h2>
-        <div class="breadcrumb" id="breadcrumb">Loading...</div>
-        <div class="file-list-header" id="file-list-header" style="display: none;">
-            <label>
-                <input type="checkbox" id="select-all-checkbox" class="file-checkbox" onchange="toggleSelectAll(this)">
-                Select all
-            </label>
-            <span id="selection-count"></span>
-        </div>
-        <ul class="file-list" id="file-list">
-            <li>Loading...</li>
-        </ul>
-        <div class="controls">
-            <select id="preset-select">
-                <option value="compress">Compress (Standard)</option>
-                <option value="compress-hard">Compress (Smaller)</option>
-                <option value="1080p">1080p</option>
-                <option value="720p">720p</option>
-            </select>
-            <button onclick="getEstimate()" id="estimate-btn" disabled>Estimate Selected</button>
-            <button onclick="startJobs()" id="start-btn" disabled>Start Transcode</button>
-        </div>
-        <div id="estimate-result"></div>
-    </div>
-
-    <div class="card">
-        <h2>Job Queue</h2>
-        <div id="jobs-list">No jobs</div>
-        <div class="controls">
-            <button onclick="clearCompleted()" class="secondary">Clear Completed</button>
-            <button onclick="refreshJobs()">Refresh</button>
-        </div>
-    </div>
-
-    <div class="card">
-        <h2>Settings</h2>
-        <div class="settings-grid" id="settings">
-            <div class="setting-row">
-                <div class="setting-label">
-                    <span class="setting-name">Original files</span>
-                    <span class="setting-description">What happens to source files after transcoding</span>
+    <div class="app">
+        <header class="header">
+            <div class="header-left">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M8 12l2 2 4-4"/>
+                        </svg>
+                    </div>
+                    Shrinkray
                 </div>
-                <div class="setting-control">
-                    <select id="setting-original-handling" onchange="updateSetting('original_handling', this.value)">
-                        <option value="replace">Replace (delete original)</option>
-                        <option value="keep">Keep (rename to .old)</option>
-                    </select>
+                <div class="stats-bar" id="stats-bar">
+                    <div class="stat-item running">
+                        <span class="stat-value" id="stat-running">0</span>
+                        <span class="stat-label">running</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="stat-pending">0</span>
+                        <span class="stat-label">pending</span>
+                    </div>
+                    <div class="stat-item success">
+                        <span class="stat-value" id="stat-saved">0 MB</span>
+                        <span class="stat-label">saved</span>
+                    </div>
                 </div>
             </div>
-            <div class="setting-row">
-                <div class="setting-label">
-                    <span class="setting-name">Concurrent jobs</span>
-                    <span class="setting-description">Number of files to transcode simultaneously</span>
+            <div class="header-right">
+                <button class="menu-btn" onclick="openSettings()" title="Settings">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <main class="main">
+            <div class="browser-panel">
+                <div class="panel">
+                    <div class="breadcrumb" id="breadcrumb">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            Loading...
+                        </div>
+                    </div>
+                    <div class="file-list-header hidden" id="file-list-header">
+                        <label>
+                            <input type="checkbox" class="file-checkbox" id="select-all-checkbox" onchange="toggleSelectAll(this)">
+                            Select all
+                        </label>
+                        <span id="selection-count"></span>
+                    </div>
+                    <ul class="file-list" id="file-list">
+                        <li class="loading">
+                            <div class="spinner"></div>
+                            Loading files...
+                        </li>
+                    </ul>
+                    <div class="actions-bar">
+                        <select class="preset-select" id="preset-select" onchange="onPresetChange()">
+                            <option value="compress">Compress (Standard)</option>
+                        </select>
+                        <button class="btn btn-secondary" onclick="toggleEstimate()" id="estimate-btn" disabled>Estimate</button>
+                        <button class="btn btn-primary" onclick="startJobs()" id="start-btn" disabled>Start Transcode</button>
+                        <span class="selection-count" id="selection-summary"></span>
+                    </div>
                 </div>
-                <div class="setting-control">
-                    <select id="setting-workers" onchange="updateSetting('workers', parseInt(this.value))">
-                        <option value="1">1 (recommended)</option>
-                        <option value="2">2</option>
-                        <option value="3">3</option>
-                        <option value="4">4</option>
-                        <option value="5">5</option>
-                        <option value="6">6</option>
-                    </select>
+
+                <div class="estimate-panel hidden" id="estimate-panel">
+                    <div class="panel-header">
+                        <span class="panel-title">Estimate</span>
+                        <button class="estimate-close" onclick="hideEstimate()">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                <line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="estimate-content" id="estimate-content">
+                        <!-- Populated by JS -->
+                    </div>
                 </div>
             </div>
-        </div>
-        <div id="settings-status" class="settings-status"></div>
+
+            <div class="queue-panel">
+                <div class="panel queue-panel-inner">
+                    <div class="panel-header">
+                        <span class="panel-title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="8" y1="6" x2="21" y2="6"/>
+                                <line x1="8" y1="12" x2="21" y2="12"/>
+                                <line x1="8" y1="18" x2="21" y2="18"/>
+                                <line x1="3" y1="6" x2="3.01" y2="6"/>
+                                <line x1="3" y1="12" x2="3.01" y2="12"/>
+                                <line x1="3" y1="18" x2="3.01" y2="18"/>
+                            </svg>
+                            Queue
+                        </span>
+                    </div>
+                    <div class="queue-list" id="queue-list">
+                        <div class="queue-empty">
+                            <div class="queue-empty-icon">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.3">
+                                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                    <path d="M3 9h18"/>
+                                    <path d="M9 21V9"/>
+                                </svg>
+                            </div>
+                            <div>No jobs in queue</div>
+                            <div style="font-size: 0.8125rem; margin-top: 4px; color: var(--text-tertiary)">Select files and start transcoding</div>
+                        </div>
+                    </div>
+                    <div class="queue-footer">
+                        <button class="btn btn-secondary btn-sm" onclick="clearCompleted()" style="flex: 1">Clear Completed</button>
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
 
-    <div class="card">
-        <h2>Debug Log</h2>
-        <div id="debug"></div>
+    <!-- Settings Panel -->
+    <div class="settings-overlay" id="settings-overlay" onclick="closeSettings(event)">
+        <div class="settings-panel" onclick="event.stopPropagation()">
+            <div class="settings-header">
+                <span class="settings-title">Settings</span>
+                <button class="settings-close" onclick="closeSettings()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="settings-content">
+                <div class="setting-group">
+                    <div class="setting-group-title">Transcoding</div>
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <div class="setting-name">Original files</div>
+                            <div class="setting-desc">What happens after transcoding</div>
+                        </div>
+                        <div class="setting-control">
+                            <select class="setting-select" id="setting-original-handling" onchange="updateSetting('original_handling', this.value)">
+                                <option value="replace">Delete original</option>
+                                <option value="keep">Keep as .old</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <div class="setting-name">Concurrent jobs</div>
+                            <div class="setting-desc">Simultaneous transcode tasks</div>
+                        </div>
+                        <div class="setting-control">
+                            <select class="setting-select" id="setting-workers" onchange="updateSetting('workers', parseInt(this.value))">
+                                <option value="1">1 (recommended)</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                                <option value="5">5</option>
+                                <option value="6">6</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="settings-status" id="settings-status"></div>
+        </div>
     </div>
 
     <script>
         let currentPath = '';
         let selectedPaths = new Set();
         let eventSource = null;
-
-        function log(msg) {
-            const debug = document.getElementById('debug');
-            const time = new Date().toLocaleTimeString();
-            debug.textContent = `[${time}] ${msg}\n` + debug.textContent;
-        }
+        let estimatePanelOpen = false;
 
         function formatBytes(bytes) {
             if (bytes === 0) return '0 B';
-            if (bytes < 0) return '0 B'; // Don't show negative savings
+            if (bytes < 0) return '0 B';
             const k = 1024;
             const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -460,20 +1146,25 @@
                 currentPath = data.path;
                 selectedPaths.clear();
                 updateButtons();
+                hideEstimate();
 
                 // Update breadcrumb
                 const breadcrumb = document.getElementById('breadcrumb');
-                let crumbs = `<a href="#" onclick="browse('')">Home</a>`;
+                let crumbs = `<a href="#" onclick="browse(''); return false;">Home</a>`;
                 if (data.parent) {
-                    crumbs += ` / <a href="#" onclick="browse('${data.parent}')">↑ Up</a>`;
+                    crumbs += `<span class="breadcrumb-sep">/</span>`;
+                    crumbs += `<a href="#" onclick="browse('${data.parent}'); return false;">...</a>`;
                 }
-                crumbs += ` / ${data.path.split('/').pop() || 'Root'}`;
+                const currentFolder = data.path.split('/').pop() || 'Root';
+                crumbs += `<span class="breadcrumb-sep">/</span>`;
+                crumbs += `<span class="breadcrumb-current">${currentFolder}</span>`;
                 breadcrumb.innerHTML = crumbs;
 
                 // Update file list
                 const list = document.getElementById('file-list');
                 if (data.entries.length === 0) {
-                    list.innerHTML = '<li class="file-item">Empty directory</li>';
+                    list.innerHTML = '<li class="file-list-empty">This folder is empty</li>';
+                    document.getElementById('file-list-header').classList.add('hidden');
                     return;
                 }
 
@@ -481,40 +1172,53 @@
                 const hasVideos = data.entries.some(e => !e.is_dir && e.video_info);
                 const header = document.getElementById('file-list-header');
                 const selectAllCheckbox = document.getElementById('select-all-checkbox');
-                header.style.display = hasVideos ? 'flex' : 'none';
+
+                if (hasVideos) {
+                    header.classList.remove('hidden');
+                } else {
+                    header.classList.add('hidden');
+                }
                 selectAllCheckbox.checked = false;
                 selectAllCheckbox.indeterminate = false;
 
                 list.innerHTML = data.entries.map(entry => {
-                    const meta = entry.is_dir
-                        ? `${entry.file_count || 0} videos, ${formatBytes(entry.total_size || 0)}`
-                        : entry.video_info
-                            ? `${entry.video_info.video_codec} ${entry.video_info.width}x${entry.video_info.height}, ${formatBytes(entry.size)}`
-                            : formatBytes(entry.size);
-
-                    const cls = entry.is_dir ? 'dir' : (entry.video_info ? 'video' : '');
                     const isVideo = !entry.is_dir && entry.video_info;
-                    const icon = entry.is_dir ? '📁' : (entry.video_info ? '🎬' : '📄');
+                    const iconClass = entry.is_dir ? 'folder' : (isVideo ? 'video' : 'other');
+                    const icon = entry.is_dir
+                        ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>`
+                        : isVideo
+                            ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>`
+                            : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
 
-                    return `<li class="file-item ${cls}"
-                        data-path="${entry.path}"
-                        data-is-dir="${entry.is_dir}"
-                        onclick="handleFileClick(this, event)">
-                        ${isVideo ? `<input type="checkbox" class="file-checkbox" onclick="handleCheckbox(this, event)" data-path="${entry.path}">` : ''}
-                        <span class="file-icon">${icon}</span>
-                        <span class="file-name">${entry.name}</span>
-                        <span class="file-meta">${meta}</span>
+                    let metaHtml = '';
+                    if (entry.is_dir) {
+                        const count = entry.file_count || 0;
+                        const size = formatBytes(entry.total_size || 0);
+                        metaHtml = `<span>${count} video${count !== 1 ? 's' : ''}</span><span>${size}</span>`;
+                    } else if (isVideo) {
+                        const vi = entry.video_info;
+                        const codecClass = vi.video_codec?.toLowerCase().includes('hevc') || vi.video_codec?.toLowerCase().includes('h265') ? 'hevc' : 'h264';
+                        metaHtml = `<span class="codec-badge ${codecClass}">${vi.video_codec}</span><span>${vi.width}x${vi.height}</span>`;
+                    }
+
+                    return `<li class="file-item" data-path="${entry.path}" data-is-dir="${entry.is_dir}" onclick="handleFileClick(this, event)">
+                        ${isVideo ? `<input type="checkbox" class="file-checkbox" onclick="handleCheckbox(this, event)" data-path="${entry.path}">` : '<div style="width: 18px"></div>'}
+                        <div class="file-icon ${iconClass}">${icon}</div>
+                        <div class="file-info">
+                            <div class="file-name">${entry.name}</div>
+                            <div class="file-meta">${metaHtml}</div>
+                        </div>
+                        <div class="file-size">${formatBytes(entry.size)}</div>
                     </li>`;
                 }).join('');
 
-                log(`Browsed: ${data.path} (${data.entries.length} items)`);
             } catch (err) {
-                log(`Error browsing: ${err.message}`);
+                console.error('Browse error:', err);
             }
         }
 
         function handleCheckbox(checkbox, event) {
-            event.stopPropagation(); // Don't trigger the row click
+            event.stopPropagation();
             const path = checkbox.dataset.path;
             const row = checkbox.closest('.file-item');
 
@@ -529,19 +1233,14 @@
         }
 
         function handleFileClick(el, event) {
+            if (event.target.classList.contains('file-checkbox')) return;
+
             const path = el.dataset.path;
             const isDir = el.dataset.isDir === 'true';
 
-            // If clicking on a checkbox, let handleCheckbox deal with it
-            if (event.target.classList.contains('file-checkbox')) {
-                return;
-            }
-
             if (isDir) {
-                // Navigate into directory
                 browse(path);
             } else {
-                // Toggle selection for video files
                 const checkbox = el.querySelector('.file-checkbox');
                 if (checkbox) {
                     checkbox.checked = !checkbox.checked;
@@ -554,30 +1253,6 @@
                     }
                     updateButtons();
                 }
-            }
-        }
-
-        function updateButtons() {
-            const hasSelection = selectedPaths.size > 0;
-            document.getElementById('estimate-btn').disabled = !hasSelection;
-            document.getElementById('start-btn').disabled = !hasSelection;
-
-            // Update selection count
-            const countEl = document.getElementById('selection-count');
-            if (hasSelection) {
-                countEl.textContent = `(${selectedPaths.size} selected)`;
-            } else {
-                countEl.textContent = '';
-            }
-
-            // Update select-all checkbox state
-            const selectAllCheckbox = document.getElementById('select-all-checkbox');
-            const allCheckboxes = document.querySelectorAll('.file-item .file-checkbox');
-            if (allCheckboxes.length > 0) {
-                const allChecked = Array.from(allCheckboxes).every(cb => cb.checked);
-                const someChecked = Array.from(allCheckboxes).some(cb => cb.checked);
-                selectAllCheckbox.checked = allChecked;
-                selectAllCheckbox.indeterminate = someChecked && !allChecked;
             }
         }
 
@@ -598,6 +1273,38 @@
             updateButtons();
         }
 
+        function updateButtons() {
+            const hasSelection = selectedPaths.size > 0;
+            document.getElementById('estimate-btn').disabled = !hasSelection;
+            document.getElementById('start-btn').disabled = !hasSelection;
+
+            const summary = document.getElementById('selection-summary');
+            if (hasSelection) {
+                summary.textContent = `${selectedPaths.size} file${selectedPaths.size > 1 ? 's' : ''} selected`;
+            } else {
+                summary.textContent = '';
+            }
+
+            // Update select-all checkbox
+            const selectAllCheckbox = document.getElementById('select-all-checkbox');
+            const allCheckboxes = document.querySelectorAll('.file-item .file-checkbox');
+            if (allCheckboxes.length > 0) {
+                const allChecked = Array.from(allCheckboxes).every(cb => cb.checked);
+                const someChecked = Array.from(allCheckboxes).some(cb => cb.checked);
+                selectAllCheckbox.checked = allChecked;
+                selectAllCheckbox.indeterminate = someChecked && !allChecked;
+            }
+
+            // Auto-refresh estimate if panel is open
+            if (estimatePanelOpen) {
+                if (hasSelection) {
+                    getEstimate();
+                } else {
+                    hideEstimate();
+                }
+            }
+        }
+
         async function getEstimate() {
             if (selectedPaths.size === 0) return;
 
@@ -614,37 +1321,80 @@
                 const data = await resp.json();
 
                 if (data.error) {
-                    document.getElementById('estimate-result').innerHTML =
-                        `<div class="warning">${data.error}</div>`;
+                    alert(data.error);
                     return;
                 }
 
-                const html = `
-                    <div class="estimate">
-                        <h3>Estimate: ${data.files.length} file(s) - ${data.preset_name}</h3>
-                        <div class="estimate-row">
-                            <span>Current size:</span>
-                            <span>${formatBytes(data.total.current_size)}</span>
-                        </div>
-                        <div class="estimate-row">
-                            <span>Estimated size:</span>
-                            <span>${formatBytes(data.total.estimated_size)} (${formatBytes(data.total.estimated_size_min)} - ${formatBytes(data.total.estimated_size_max)})</span>
-                        </div>
-                        <div class="estimate-row">
-                            <span>Space saved:</span>
-                            <span class="savings">${formatBytes(data.total.space_saved)} (${data.total.savings_percent.toFixed(1)}%)</span>
-                        </div>
-                        <div class="estimate-row">
-                            <span>Estimated time:</span>
-                            <span>${formatDuration(data.total.estimated_time / 1000000000)}</span>
-                        </div>
-                        ${data.total.warning ? `<div class="warning">${data.total.warning}</div>` : ''}
+                const panel = document.getElementById('estimate-panel');
+                const content = document.getElementById('estimate-content');
+
+                let html = `
+                    <div class="estimate-row">
+                        <span class="estimate-label">${data.files.length} file${data.files.length > 1 ? 's' : ''}</span>
+                        <span class="estimate-value">${data.preset_name}</span>
+                    </div>
+                    <div class="estimate-row">
+                        <span class="estimate-label">Current size</span>
+                        <span class="estimate-value">${formatBytes(data.total.current_size)}</span>
+                    </div>
+                    <div class="estimate-row">
+                        <span class="estimate-label">Estimated size</span>
+                        <span class="estimate-value">
+                            ${formatBytes(data.total.estimated_size)}
+                            <span class="estimate-range">(${formatBytes(data.total.estimated_size_min)} - ${formatBytes(data.total.estimated_size_max)})</span>
+                        </span>
+                    </div>
+                    <div class="estimate-row">
+                        <span class="estimate-label">Space saved</span>
+                        <span class="estimate-value savings">
+                            ${formatBytes(data.total.space_saved)} (${data.total.savings_percent.toFixed(0)}%)
+                        </span>
+                    </div>
+                    <div class="estimate-row">
+                        <span class="estimate-label">Estimated time</span>
+                        <span class="estimate-value">${formatDuration(data.total.estimated_time / 1000000000)}</span>
                     </div>
                 `;
-                document.getElementById('estimate-result').innerHTML = html;
-                log(`Estimate: ${formatBytes(data.total.current_size)} → ${formatBytes(data.total.estimated_size)} (${data.total.savings_percent.toFixed(1)}% savings)`);
+
+                if (data.total.warning) {
+                    html += `
+                        <div class="estimate-warning">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0; margin-top: 2px">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                                <line x1="12" y1="9" x2="12" y2="13"/>
+                                <line x1="12" y1="17" x2="12.01" y2="17"/>
+                            </svg>
+                            <span>${data.total.warning}</span>
+                        </div>
+                    `;
+                }
+
+                content.innerHTML = html;
+                panel.classList.remove('hidden');
+                estimatePanelOpen = true;
+
             } catch (err) {
-                log(`Error estimating: ${err.message}`);
+                console.error('Estimate error:', err);
+            }
+        }
+
+        function hideEstimate() {
+            document.getElementById('estimate-panel').classList.add('hidden');
+            estimatePanelOpen = false;
+        }
+
+        function onPresetChange() {
+            // Auto-refresh estimate if panel is open and we have selection
+            if (estimatePanelOpen && selectedPaths.size > 0) {
+                getEstimate();
+            }
+        }
+
+        function toggleEstimate() {
+            if (estimatePanelOpen) {
+                hideEstimate();
+            } else {
+                getEstimate();
             }
         }
 
@@ -664,39 +1414,38 @@
                 const data = await resp.json();
 
                 if (data.error) {
-                    log(`Error creating jobs: ${data.error}`);
+                    alert(data.error);
                     return;
                 }
 
-                log(`Created ${data.count} job(s)`);
                 selectedPaths.clear();
                 document.querySelectorAll('.file-item.selected').forEach(el => {
                     el.classList.remove('selected');
+                    const cb = el.querySelector('.file-checkbox');
+                    if (cb) cb.checked = false;
                 });
                 updateButtons();
-                document.getElementById('estimate-result').innerHTML = '';
+                hideEstimate();
+
             } catch (err) {
-                log(`Error creating jobs: ${err.message}`);
+                console.error('Start jobs error:', err);
             }
         }
 
         async function cancelJob(id) {
             try {
                 await fetch(`/api/jobs/${id}`, { method: 'DELETE' });
-                log(`Cancelled job ${id}`);
             } catch (err) {
-                log(`Error cancelling: ${err.message}`);
+                console.error('Cancel error:', err);
             }
         }
 
         async function clearCompleted() {
             try {
-                const resp = await fetch('/api/jobs/clear', { method: 'POST' });
-                const data = await resp.json();
-                log(`Cleared ${data.cleared} completed jobs`);
-                refreshJobs(); // Auto-refresh after clearing
+                await fetch('/api/jobs/clear', { method: 'POST' });
+                refreshJobs();
             } catch (err) {
-                log(`Error clearing: ${err.message}`);
+                console.error('Clear error:', err);
             }
         }
 
@@ -707,54 +1456,76 @@
                 updateJobs(data.jobs);
                 updateStats(data.stats);
             } catch (err) {
-                log(`Error refreshing: ${err.message}`);
+                console.error('Refresh error:', err);
             }
         }
 
         function updateJobs(jobs) {
-            const container = document.getElementById('jobs-list');
+            const container = document.getElementById('queue-list');
 
             if (!jobs || jobs.length === 0) {
-                container.innerHTML = '<p style="color: #86868b; padding: 15px;">No jobs in queue</p>';
+                container.innerHTML = `
+                    <div class="queue-empty">
+                        <div class="queue-empty-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.3">
+                                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                <path d="M3 9h18"/>
+                                <path d="M9 21V9"/>
+                            </svg>
+                        </div>
+                        <div>No jobs in queue</div>
+                        <div style="font-size: 0.8125rem; margin-top: 4px; color: var(--text-tertiary)">Select files and start transcoding</div>
+                    </div>
+                `;
                 return;
             }
 
             container.innerHTML = jobs.map(job => {
                 const filename = job.input_path.split('/').pop();
-                const encoderClass = job.is_hardware ? 'hardware' : 'software';
-                const encoderLabel = job.is_hardware ? 'Hardware' : 'Software';
                 const isInitializing = job.status === 'running' && job.progress === 0 && job.speed === 0;
+                const statusClass = isInitializing ? 'initializing' : job.status;
+                const statusLabel = isInitializing ? 'Initializing' : job.status.charAt(0).toUpperCase() + job.status.slice(1);
+
+                let detailsHtml = '';
+                if (job.status === 'running') {
+                    if (isInitializing) {
+                        detailsHtml = '<span class="job-detail">Starting encoder...</span>';
+                    } else {
+                        detailsHtml = `
+                            <span class="job-detail"><span class="job-detail-value">${job.progress.toFixed(1)}%</span></span>
+                            <span class="job-detail"><span class="job-detail-value">${job.speed.toFixed(2)}x</span></span>
+                            <span class="job-detail">ETA: <span class="job-detail-value">${job.eta || '...'}</span></span>
+                        `;
+                    }
+                } else if (job.status === 'complete') {
+                    detailsHtml = `
+                        <span class="job-detail job-saved">Saved <span class="job-detail-value">${formatBytes(job.space_saved)}</span></span>
+                        <span class="job-detail">${formatBytes(job.input_size)} → ${formatBytes(job.output_size)}</span>
+                    `;
+                }
+
                 return `
-                    <div class="job">
+                    <div class="job-item">
                         <div class="job-header">
-                            <span class="job-path" title="${job.input_path}">${filename}</span>
-                            <span>
-                                <span class="encoder-badge ${encoderClass}">${encoderLabel}</span>
-                                <span class="job-status ${job.status}">${isInitializing ? 'initializing' : job.status}</span>
-                            </span>
+                            <span class="job-name" title="${job.input_path}">${filename}</span>
+                            <div class="job-badges">
+                                <span class="job-badge ${job.is_hardware ? 'hardware' : 'software'}">${job.is_hardware ? 'HW' : 'SW'}</span>
+                                <span class="job-badge ${statusClass}">${statusLabel}</span>
+                            </div>
                         </div>
                         ${job.status === 'running' ? `
-                            <div class="progress-bar">
-                                <div class="progress-fill ${isInitializing ? 'initializing' : ''}" style="width: ${isInitializing ? '100' : job.progress}%"></div>
+                            <div class="job-progress">
+                                <div class="progress-bar">
+                                    <div class="progress-fill ${isInitializing ? 'initializing' : ''}" style="width: ${isInitializing ? 100 : job.progress}%"></div>
+                                </div>
                             </div>
                         ` : ''}
-                        <div class="job-details">
-                            <span>Preset: ${job.preset_id}</span>
-                            ${job.status === 'running' ? (isInitializing ? `
-                                <span>Starting encoder...</span>
-                            ` : `
-                                <span>${job.progress.toFixed(1)}%</span>
-                                <span>Speed: ${job.speed.toFixed(2)}x</span>
-                                <span>ETA: ${job.eta || 'calculating...'}</span>
-                            `) : ''}
-                            ${job.status === 'complete' ? `
-                                <span>Saved: ${formatBytes(job.space_saved)}</span>
-                                <span>${formatBytes(job.input_size)} → ${formatBytes(job.output_size)}</span>
-                            ` : ''}
-                            ${job.status === 'failed' ? `<span style="color: #ff3b30">${job.error}</span>` : ''}
-                        </div>
+                        <div class="job-details">${detailsHtml}</div>
+                        ${job.status === 'failed' ? `<div class="job-error">${job.error}</div>` : ''}
                         ${job.status === 'pending' || job.status === 'running' ? `
-                            <button onclick="cancelJob('${job.id}')" class="danger" style="margin-top: 10px; padding: 5px 10px; font-size: 0.875rem;">Cancel</button>
+                            <div class="job-actions">
+                                <button class="btn btn-secondary btn-sm" onclick="cancelJob('${job.id}')">Cancel</button>
+                            </div>
                         ` : ''}
                     </div>
                 `;
@@ -764,32 +1535,22 @@
         function updateStats(stats) {
             document.getElementById('stat-pending').textContent = stats.pending;
             document.getElementById('stat-running').textContent = stats.running;
-            document.getElementById('stat-complete').textContent = stats.complete;
-            document.getElementById('stat-failed').textContent = stats.failed;
-            // Clamp to 0 - don't show negative savings
             const saved = Math.max(0, stats.total_saved || 0);
             document.getElementById('stat-saved').textContent = formatBytes(saved);
         }
 
         function connectSSE() {
-            if (eventSource) {
-                eventSource.close();
-            }
+            if (eventSource) eventSource.close();
 
             eventSource = new EventSource('/api/jobs/stream');
 
             eventSource.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-
                 if (data.type === 'init') {
                     updateJobs(data.jobs);
                     updateStats(data.stats);
-                    log('Connected to SSE stream');
                 } else {
-                    log(`Event: ${data.type} - ${data.job?.id || ''}`);
                     refreshJobs();
-
-                    // Refresh file browser when a job completes to show updated metadata
                     if (data.type === 'complete' || data.type === 'failed') {
                         browse(currentPath);
                     }
@@ -797,28 +1558,28 @@
             };
 
             eventSource.onerror = () => {
-                log('SSE connection lost, reconnecting...');
                 setTimeout(connectSSE, 2000);
             };
         }
 
-        // Settings functions
+        // Settings
+        function openSettings() {
+            document.getElementById('settings-overlay').classList.add('open');
+        }
+
+        function closeSettings(event) {
+            if (event && event.target !== event.currentTarget) return;
+            document.getElementById('settings-overlay').classList.remove('open');
+        }
+
         async function loadSettings() {
             try {
                 const resp = await fetch('/api/config');
                 const config = await resp.json();
-
-                // Set original handling dropdown
-                const handlingSelect = document.getElementById('setting-original-handling');
-                handlingSelect.value = config.original_handling || 'replace';
-
-                // Set workers dropdown
-                const workersSelect = document.getElementById('setting-workers');
-                workersSelect.value = config.workers || 1;
-
-                log(`Settings loaded: original_handling=${config.original_handling}, workers=${config.workers}`);
+                document.getElementById('setting-original-handling').value = config.original_handling || 'replace';
+                document.getElementById('setting-workers').value = config.workers || 1;
             } catch (err) {
-                log(`Error loading settings: ${err.message}`);
+                console.error('Load settings error:', err);
             }
         }
 
@@ -841,33 +1602,36 @@
 
                 statusEl.textContent = 'Settings saved';
                 statusEl.className = 'settings-status';
-                log(`Setting updated: ${key}=${value}`);
-
-                // Clear status after 2 seconds
-                setTimeout(() => {
-                    statusEl.textContent = '';
-                }, 2000);
+                setTimeout(() => { statusEl.textContent = ''; }, 2000);
             } catch (err) {
                 statusEl.textContent = `Error: ${err.message}`;
                 statusEl.className = 'settings-status error';
-                log(`Error updating setting: ${err.message}`);
             }
         }
+
+        async function loadPresets() {
+            try {
+                const presets = await fetch('/api/presets').then(r => r.json());
+                const select = document.getElementById('preset-select');
+                select.innerHTML = presets.map(p =>
+                    `<option value="${p.id}">${p.name}</option>`
+                ).join('');
+            } catch (err) {
+                console.error('Load presets error:', err);
+            }
+        }
+
+        // Keyboard shortcut for settings
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeSettings();
+            }
+        });
 
         // Initialize
         browse();
         connectSSE();
         loadSettings();
-
-        // Load presets
-        async function loadPresets() {
-            const presets = await fetch('/api/presets').then(r => r.json());
-            const select = document.getElementById('preset-select');
-            select.innerHTML = presets.map(p =>
-                `<option value="${p.id}">${p.name} - ${p.description}</option>`
-            ).join('');
-            log(`Loaded ${presets.length} presets`);
-        }
         loadPresets();
     </script>
 </body>
