@@ -170,17 +170,46 @@ func DetectEncoders(ffmpegPath string) map[EncoderKey]*HWEncoder {
 		encCopy := *enc
 		key := EncoderKey{enc.Accel, enc.Codec}
 
+		// First check if encoder exists in ffmpeg
+		if !strings.Contains(encoderList, enc.Encoder) {
+			encCopy.Available = false
+			availableEncoders.encoders[key] = &encCopy
+			continue
+		}
+
 		if enc.Accel == HWAccelNone {
-			// Software encoders - check if available in ffmpeg
-			encCopy.Available = strings.Contains(encoderList, enc.Encoder)
+			// Software encoders - just check if listed in ffmpeg
+			encCopy.Available = true
 		} else {
-			encCopy.Available = strings.Contains(encoderList, enc.Encoder)
+			// Hardware encoders - actually test if they work
+			encCopy.Available = testEncoder(ffmpegPath, enc.Encoder)
 		}
 		availableEncoders.encoders[key] = &encCopy
 	}
 
 	availableEncoders.detected = true
 	return copyEncoders(availableEncoders.encoders)
+}
+
+// testEncoder tries a quick test encode to verify hardware encoder actually works
+func testEncoder(ffmpegPath string, encoder string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Try to encode a single frame from a test pattern
+	// This will fail fast if the hardware doesn't actually support the encoder
+	cmd := exec.CommandContext(ctx, ffmpegPath,
+		"-f", "lavfi",
+		"-i", "color=c=black:s=64x64:d=0.1",
+		"-frames:v", "1",
+		"-c:v", encoder,
+		"-f", "null",
+		"-",
+	)
+
+	// We don't care about output, just whether it succeeds
+	err := cmd.Run()
+	return err == nil
 }
 
 // GetAvailableEncoders returns all detected encoders (must call DetectEncoders first)
