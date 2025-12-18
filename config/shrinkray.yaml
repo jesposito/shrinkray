@@ -1,0 +1,7 @@
+media_path: ./testdata
+temp_path: ""
+original_handling: replace
+workers: 3
+ffmpeg_path: ffmpeg
+ffprobe_path: ffprobe
+queue_file: config/queue.json
