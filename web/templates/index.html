@@ -1397,6 +1397,8 @@
 
             try {
                 const preset = document.getElementById('preset-select').value;
+                const pathCount = selectedPaths.size;
+
                 const resp = await fetch('/api/jobs', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1407,11 +1409,13 @@
                 });
                 const data = await resp.json();
 
+                // Check for validation errors (bad request)
                 if (data.error) {
                     alert(data.error);
                     return;
                 }
 
+                // Clear selections immediately - jobs will appear via SSE as they're processed
                 selectedPaths.clear();
                 document.querySelectorAll('.file-item.selected').forEach(el => {
                     el.classList.remove('selected');
@@ -1419,6 +1423,13 @@
                     if (cb) cb.checked = false;
                 });
                 updateButtons();
+
+                // Reset select-all checkbox
+                const selectAllCheckbox = document.getElementById('select-all-checkbox');
+                if (selectAllCheckbox) {
+                    selectAllCheckbox.checked = false;
+                    selectAllCheckbox.indeterminate = false;
+                }
 
             } catch (err) {
                 console.error('Start jobs error:', err);

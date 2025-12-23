@@ -91,6 +91,7 @@ type CreateJobsRequest struct {
 }
 
 // CreateJobs handles POST /api/jobs
+// Responds immediately and processes files in background to avoid UI freeze
 func (h *Handler) CreateJobs(w http.ResponseWriter, r *http.Request) {
 	var req CreateJobsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -109,33 +110,31 @@ func (h *Handler) CreateJobs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
-	defer cancel()
-
-	// Get all video files
-	probes, err := h.browser.GetVideoFiles(ctx, req.Paths)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	if len(probes) == 0 {
-		writeError(w, http.StatusBadRequest, "no video files found in selection")
-		return
-	}
-
-	// Add jobs to queue
-	createdJobs, err := h.queue.AddMultiple(probes, req.PresetID)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	writeJSON(w, http.StatusCreated, map[string]interface{}{
-		"jobs":    createdJobs,
-		"count":   len(createdJobs),
-		"message": fmt.Sprintf("Created %d jobs", len(createdJobs)),
+	// Respond immediately - jobs will be added in background and appear via SSE
+	writeJSON(w, http.StatusAccepted, map[string]interface{}{
+		"status":  "processing",
+		"message": fmt.Sprintf("Processing %d paths in background...", len(req.Paths)),
 	})
+
+	// Process in background goroutine
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+
+		// Get all video files (this is the slow part - probing with ffprobe)
+		probes, err := h.browser.GetVideoFiles(ctx, req.Paths)
+		if err != nil {
+			fmt.Printf("Error getting video files: %v\n", err)
+			return
+		}
+
+		if len(probes) == 0 {
+			return
+		}
+
+		// Add jobs to queue - SSE will notify frontend of new jobs
+		h.queue.AddMultiple(probes, req.PresetID)
+	}()
 }
 
 // ListJobs handles GET /api/jobs
