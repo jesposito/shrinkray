@@ -188,21 +188,16 @@ func BuildTempPath(inputPath, tempDir string) string {
 	return filepath.Join(tempDir, tempName)
 }
 
-// copyFile copies a file from src to dst, preserving permissions.
+// copyFile copies a file from src to dst with the specified permissions.
 // Works across filesystems unlike os.Rename.
-func copyFile(src, dst string) error {
+func copyFile(src, dst string, perm os.FileMode) error {
 	srcFile, err := os.Open(src)
 	if err != nil {
 		return err
 	}
 	defer srcFile.Close()
 
-	srcInfo, err := srcFile.Stat()
-	if err != nil {
-		return err
-	}
-
-	dstFile, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, srcInfo.Mode())
+	dstFile, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, perm)
 	if err != nil {
 		return err
 	}
@@ -226,13 +221,20 @@ func FinalizeTranscode(inputPath, tempPath string, replace bool) (finalPath stri
 	name := strings.TrimSuffix(base, ext)
 	finalPath = filepath.Join(dir, name+".mkv")
 
+	// Get original file permissions before we delete/rename it
+	inputInfo, err := os.Stat(inputPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to stat original file: %w", err)
+	}
+	perm := inputInfo.Mode().Perm()
+
 	if replace {
 		// Replace mode: delete original, copy temp to final location
 		if err := os.Remove(inputPath); err != nil {
 			return "", fmt.Errorf("failed to remove original file: %w", err)
 		}
 
-		if err := copyFile(tempPath, finalPath); err != nil {
+		if err := copyFile(tempPath, finalPath, perm); err != nil {
 			return "", fmt.Errorf("failed to copy temp to final location: %w", err)
 		}
 
@@ -246,7 +248,7 @@ func FinalizeTranscode(inputPath, tempPath string, replace bool) (finalPath stri
 		return "", fmt.Errorf("failed to rename original to .old: %w", err)
 	}
 
-	if err := copyFile(tempPath, finalPath); err != nil {
+	if err := copyFile(tempPath, finalPath, perm); err != nil {
 		// Try to restore original
 		os.Rename(oldPath, inputPath)
 		return "", fmt.Errorf("failed to copy temp to final location: %w", err)

@@ -64,37 +64,37 @@ var encoderConfigs = map[EncoderKey]encoderSettings{
 	},
 
 	// AV1 encoders
-	// SVT-AV1 CRF 38 ≈ x265 CRF 26 (aggressive compression)
+	// Quality matched to HEVC equivalents (AV1 is ~20% more efficient at same quality)
 	{HWAccelNone, CodecAV1}: {
 		encoder:     "libsvtav1",
 		qualityFlag: "-crf",
-		quality:     "38",
+		quality:     "32",
 		extraArgs:   []string{"-preset", "6"},
 	},
 	{HWAccelVideoToolbox, CodecAV1}: {
 		// VideoToolbox AV1 (M3+ chips) uses bitrate control
 		encoder:     "av1_videotoolbox",
 		qualityFlag: "-b:v",
-		quality:     "0.25", // 25% of source bitrate (aggressive)
+		quality:     "0.35", // 35% of source bitrate (same as HEVC)
 		extraArgs:   []string{"-allow_sw", "1"},
 		usesBitrate: true,
 	},
 	{HWAccelNVENC, CodecAV1}: {
 		encoder:     "av1_nvenc",
 		qualityFlag: "-cq",
-		quality:     "36",
+		quality:     "28",
 		extraArgs:   []string{"-preset", "p4", "-tune", "hq", "-rc", "vbr"},
 	},
 	{HWAccelQSV, CodecAV1}: {
 		encoder:     "av1_qsv",
 		qualityFlag: "-global_quality",
-		quality:     "34",
+		quality:     "27",
 		extraArgs:   []string{"-preset", "medium"},
 	},
 	{HWAccelVAAPI, CodecAV1}: {
 		encoder:     "av1_vaapi",
 		qualityFlag: "-qp",
-		quality:     "34",
+		quality:     "27",
 		extraArgs:   []string{},
 	},
 }
