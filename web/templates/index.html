@@ -937,6 +937,65 @@
         .hidden {
             display: none !important;
         }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity var(--transition-normal), visibility var(--transition-normal);
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            max-width: 420px;
+            width: calc(100% - 32px);
+            padding: 24px;
+            transform: scale(0.95) translateY(10px);
+            transition: transform var(--transition-normal);
+        }
+
+        .modal-overlay.active .modal {
+            transform: scale(1) translateY(0);
+        }
+
+        .modal-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+        }
+
+        .modal-message {
+            font-size: 0.9375rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        .modal-actions .btn {
+            min-width: 100px;
+        }
     </style>
 </head>
 <body>
@@ -1124,6 +1183,18 @@
                 </div>
             </div>
             <div class="settings-status" id="settings-status"></div>
+        </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="confirm-modal" class="modal-overlay" onclick="closeConfirmModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-title" id="confirm-modal-title">Confirm</div>
+            <div class="modal-message" id="confirm-modal-message"></div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeConfirmModal()">Cancel</button>
+                <button class="btn btn-primary" id="confirm-modal-action">Confirm</button>
+            </div>
         </div>
     </div>
 
@@ -1358,14 +1429,44 @@
             }
         }
 
-        async function clearQueue() {
-            try {
-                await fetch('/api/jobs/clear', { method: 'POST' });
-                refreshJobs();
-            } catch (err) {
-                console.error('Clear error:', err);
-            }
+        function clearQueue() {
+            showConfirmModal(
+                'Clear Queue',
+                'This will remove all non-active jobs from the queue (including pending jobs). Your active jobs will not be affected.',
+                async () => {
+                    try {
+                        await fetch('/api/jobs/clear', { method: 'POST' });
+                        refreshJobs();
+                    } catch (err) {
+                        console.error('Clear error:', err);
+                    }
+                }
+            );
         }
+
+        // Confirm Modal
+        let confirmCallback = null;
+
+        function showConfirmModal(title, message, onConfirm) {
+            document.getElementById('confirm-modal-title').textContent = title;
+            document.getElementById('confirm-modal-message').textContent = message;
+            confirmCallback = onConfirm;
+            document.getElementById('confirm-modal').classList.add('active');
+        }
+
+        function closeConfirmModal(event) {
+            // If called from overlay click, only close if clicking the overlay itself
+            if (event && event.target !== event.currentTarget) return;
+            document.getElementById('confirm-modal').classList.remove('active');
+            confirmCallback = null;
+        }
+
+        document.getElementById('confirm-modal-action').addEventListener('click', () => {
+            if (confirmCallback) {
+                confirmCallback();
+            }
+            closeConfirmModal();
+        });
 
         async function refreshJobs() {
             try {

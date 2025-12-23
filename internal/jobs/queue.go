@@ -336,8 +336,8 @@ func (q *Queue) CancelJob(id string) error {
 	return nil
 }
 
-// Clear removes all finished jobs from the queue (completed, failed, cancelled)
-// Running and pending jobs are kept.
+// Clear removes all non-running jobs from the queue (pending, completed, failed, cancelled)
+// Only running jobs are kept.
 func (q *Queue) Clear() int {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -349,8 +349,8 @@ func (q *Queue) Clear() int {
 		if !ok {
 			continue
 		}
-		if job.Status == StatusRunning || job.Status == StatusPending {
-			// Keep running and pending jobs
+		if job.Status == StatusRunning {
+			// Keep only running jobs
 			newOrder = append(newOrder, id)
 		} else {
 			delete(q.jobs, id)
