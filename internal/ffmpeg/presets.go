@@ -75,11 +75,11 @@ var encoderConfigs = map[EncoderKey]encoderSettings{
 	},
 
 	// AV1 encoders
-	// Slightly higher quality than HEVC equivalents (~10% more bitrate/quality)
+	// More aggressive compression than HEVC - AV1 handles lower bitrates better
 	{HWAccelNone, CodecAV1}: {
 		encoder:     "libsvtav1",
 		qualityFlag: "-crf",
-		quality:     "29",
+		quality:     "35",
 		extraArgs:   []string{"-preset", "6"},
 		scaleFilter: "scale",
 	},
@@ -87,7 +87,7 @@ var encoderConfigs = map[EncoderKey]encoderSettings{
 		// VideoToolbox AV1 (M3+ chips) uses bitrate control
 		encoder:     "av1_videotoolbox",
 		qualityFlag: "-b:v",
-		quality:     "0.40", // 40% of source bitrate
+		quality:     "0.25", // 25% of source bitrate
 		extraArgs:   []string{"-allow_sw", "1"},
 		usesBitrate: true,
 		hwaccelArgs: []string{"-hwaccel", "videotoolbox"},
@@ -96,7 +96,7 @@ var encoderConfigs = map[EncoderKey]encoderSettings{
 	{HWAccelNVENC, CodecAV1}: {
 		encoder:     "av1_nvenc",
 		qualityFlag: "-cq",
-		quality:     "25",
+		quality:     "32",
 		extraArgs:   []string{"-preset", "p4", "-tune", "hq", "-rc", "vbr"},
 		hwaccelArgs: []string{"-hwaccel", "cuda", "-hwaccel_output_format", "cuda"},
 		scaleFilter: "scale_cuda",
@@ -104,7 +104,7 @@ var encoderConfigs = map[EncoderKey]encoderSettings{
 	{HWAccelQSV, CodecAV1}: {
 		encoder:     "av1_qsv",
 		qualityFlag: "-global_quality",
-		quality:     "24",
+		quality:     "32",
 		extraArgs:   []string{"-preset", "medium"},
 		hwaccelArgs: []string{"-hwaccel", "qsv", "-hwaccel_output_format", "qsv"},
 		scaleFilter: "scale_qsv",
@@ -112,7 +112,7 @@ var encoderConfigs = map[EncoderKey]encoderSettings{
 	{HWAccelVAAPI, CodecAV1}: {
 		encoder:     "av1_vaapi",
 		qualityFlag: "-qp",
-		quality:     "24",
+		quality:     "32",
 		extraArgs:   []string{},
 		hwaccelArgs: []string{"-vaapi_device", "", "-hwaccel", "vaapi", "-hwaccel_output_format", "vaapi"}, // Device path filled dynamically
 		scaleFilter: "scale_vaapi",
