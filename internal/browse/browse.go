@@ -282,3 +282,12 @@ func (b *Browser) InvalidateCache(path string) {
 	delete(b.cache, path)
 	b.cacheMu.Unlock()
 }
+
+// ProbeFile probes a single file and returns its metadata
+func (b *Browser) ProbeFile(ctx context.Context, path string) (*ffmpeg.ProbeResult, error) {
+	result, err := b.prober.Probe(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}

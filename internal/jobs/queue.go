@@ -366,6 +366,27 @@ func (q *Queue) Clear() int {
 	return count
 }
 
+// Remove removes a single job from the queue (for retry functionality)
+func (q *Queue) Remove(id string) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	delete(q.jobs, id)
+
+	// Remove from order slice
+	newOrder := make([]string, 0, len(q.order))
+	for _, jid := range q.order {
+		if jid != id {
+			newOrder = append(newOrder, jid)
+		}
+	}
+	q.order = newOrder
+
+	if err := q.save(); err != nil {
+		fmt.Printf("Warning: failed to persist queue: %v\n", err)
+	}
+}
+
 // Subscribe returns a channel that receives job events
 func (q *Queue) Subscribe() chan JobEvent {
 	ch := make(chan JobEvent, 100)

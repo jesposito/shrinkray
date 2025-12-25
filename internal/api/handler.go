@@ -311,3 +311,45 @@ func (h *Handler) TestPushover(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetPushover() *pushover.Client {
 	return h.pushover
 }
+
+// RetryJob handles POST /api/jobs/:id/retry
+func (h *Handler) RetryJob(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "job ID required")
+		return
+	}
+
+	job := h.queue.Get(id)
+	if job == nil {
+		writeError(w, http.StatusNotFound, "job not found")
+		return
+	}
+
+	if job.Status != jobs.StatusFailed {
+		writeError(w, http.StatusBadRequest, "can only retry failed jobs")
+		return
+	}
+
+	// Re-probe the file and create a new job
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	probe, err := h.browser.ProbeFile(ctx, job.InputPath)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("failed to probe file: %v", err))
+		return
+	}
+
+	// Add new job with same preset
+	newJob, err := h.queue.Add(job.InputPath, job.PresetID, probe)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to create job: %v", err))
+		return
+	}
+
+	// Remove the failed job
+	h.queue.Remove(id)
+
+	writeJSON(w, http.StatusOK, newJob)
+}

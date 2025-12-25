@@ -1453,6 +1453,18 @@
             }
         }
 
+        async function retryJob(id) {
+            try {
+                const resp = await fetch(`/api/jobs/${id}/retry`, { method: 'POST' });
+                if (!resp.ok) {
+                    const data = await resp.json();
+                    alert(data.error || 'Failed to retry job');
+                }
+            } catch (err) {
+                console.error('Retry error:', err);
+            }
+        }
+
         function clearQueue() {
             showConfirmModal(
                 'Clear Queue',
@@ -1569,6 +1581,11 @@
                         ${job.status === 'pending' || job.status === 'running' ? `
                             <div class="job-actions">
                                 <button class="btn btn-secondary btn-sm" onclick="cancelJob('${job.id}')">Cancel</button>
+                            </div>
+                        ` : ''}
+                        ${job.status === 'failed' ? `
+                            <div class="job-actions">
+                                <button class="btn btn-secondary btn-sm" onclick="retryJob('${job.id}')">Retry</button>
                             </div>
                         ` : ''}
                     </div>
