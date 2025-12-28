@@ -45,8 +45,8 @@ For hardware acceleration, add the appropriate device:
 
 | Preset | Description |
 |--------|-------------|
-| **Compress (HEVC)** | Re-encode to H.265, typically 50-60% smaller |
-| **Compress (AV1)** | Re-encode to AV1, maximum compression |
+| **Compress (HEVC)** | Re-encode to H.265 (HEVC) |
+| **Compress (AV1)** | Re-encode to AV1 |
 | **1080p** | Downscale to 1080p + HEVC |
 | **720p** | Downscale to 720p + HEVC |
 
