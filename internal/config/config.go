@@ -32,14 +32,14 @@ type FeatureFlags struct {
 	DeltaProgress bool `yaml:"delta_progress"`
 }
 
-// DefaultFeatureFlags returns feature flags with safe defaults (all new features OFF)
+// DefaultFeatureFlags returns feature flags with performance features enabled by default
 func DefaultFeatureFlags() FeatureFlags {
 	return FeatureFlags{
-		VirtualScroll:   false, // Safe default: use current rendering
-		DeferredProbing: false, // Safe default: probe all files first
-		PaginatedInit:   false, // Safe default: send all jobs on init
-		BatchedSSE:      true,  // Already implemented and safe
-		DeltaProgress:   true,  // Already implemented and safe
+		VirtualScroll:   true,  // Render only visible items for large queues
+		DeferredProbing: true,  // Add jobs instantly, probe when worker picks up
+		PaginatedInit:   false, // Not implemented yet
+		BatchedSSE:      true,  // Batch add events to reduce SSE flood
+		DeltaProgress:   true,  // Small progress payloads
 	}
 }
 

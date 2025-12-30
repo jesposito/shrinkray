@@ -142,19 +142,25 @@ func (h *Handler) CreateJobs(w http.ResponseWriter, r *http.Request) {
 			opts.Recursive = *req.IncludeSubfolders
 		}
 
+		log.Printf("[api] CreateJobs background: deferred_probing=%v, recursive=%v, paths=%v",
+			h.cfg.Features.DeferredProbing, opts.Recursive, req.Paths)
+
 		// Check if deferred probing is enabled
 		if h.cfg.Features.DeferredProbing {
 			// Streaming discovery: add jobs immediately without probing
 			// Files are probed by workers when they pick up the job
 			files, err := h.browser.DiscoverVideoFiles(ctx, req.Paths, opts)
 			if err != nil {
-				fmt.Printf("Error discovering video files: %v\n", err)
+				log.Printf("[api] Error discovering video files: %v", err)
 				return
 			}
 
 			if len(files) == 0 {
+				log.Printf("[api] No video files found in paths: %v (recursive=%v)", req.Paths, opts.Recursive)
 				return
 			}
+
+			log.Printf("[api] Discovered %d video files, adding as pending_probe", len(files))
 
 			// Convert to FileInfo for queue
 			fileInfos := make([]jobs.FileInfo, len(files))

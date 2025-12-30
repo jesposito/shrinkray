@@ -320,6 +320,8 @@ type DiscoveredFile struct {
 func (b *Browser) DiscoverVideoFiles(ctx context.Context, paths []string, opts GetVideoFilesOptions) ([]DiscoveredFile, error) {
 	var results []DiscoveredFile
 
+	log.Printf("[browse] DiscoverVideoFiles: mediaRoot=%s, paths=%v, recursive=%v", b.mediaRoot, paths, opts.Recursive)
+
 	for _, path := range paths {
 		// Convert to absolute path for consistent comparisons
 		cleanPath, err := filepath.Abs(path)
@@ -329,6 +331,7 @@ func (b *Browser) DiscoverVideoFiles(ctx context.Context, paths []string, opts G
 
 		// Ensure path is within media root
 		if !strings.HasPrefix(cleanPath, b.mediaRoot) {
+			log.Printf("[browse] Path %s is outside media root %s, skipping", cleanPath, b.mediaRoot)
 			continue
 		}
 
@@ -338,11 +341,14 @@ func (b *Browser) DiscoverVideoFiles(ctx context.Context, paths []string, opts G
 		}
 
 		if info.IsDir() {
+			log.Printf("[browse] Discovering files in directory: %s", cleanPath)
 			// Find video files with recursion control
 			videoPaths, err := b.discoverMediaFiles(cleanPath, opts.Recursive, opts.MaxDepth)
 			if err != nil {
+				log.Printf("[browse] Error discovering files in %s: %v", cleanPath, err)
 				return nil, err
 			}
+			log.Printf("[browse] Found %d video files in %s", len(videoPaths), cleanPath)
 
 			// Get file sizes for each discovered file
 			for _, fp := range videoPaths {
