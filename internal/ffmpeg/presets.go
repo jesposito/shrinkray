@@ -146,7 +146,15 @@ func BuildPresetArgs(preset *Preset, sourceBitrate int64) (inputArgs []string, o
 		config = encoderConfigs[EncoderKey{HWAccelNone, preset.Codec}]
 	}
 
-	// Input args: hardware acceleration for decoding
+	// Input args: Add probesize and analyzeduration to speed up analysis
+	// of files with many streams (especially PGS subtitles)
+	// 50MB probesize and 10 seconds analyzeduration handles most files well
+	inputArgs = append(inputArgs,
+		"-probesize", "50M",
+		"-analyzeduration", "10M", // 10 seconds in microseconds
+	)
+
+	// Hardware acceleration for decoding
 	for _, arg := range config.hwaccelArgs {
 		// Fill in VAAPI device path dynamically
 		if arg == "" && len(inputArgs) > 0 && inputArgs[len(inputArgs)-1] == "-vaapi_device" {

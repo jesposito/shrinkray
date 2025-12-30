@@ -126,9 +126,13 @@ func TestBuildPresetArgsNonBitrateEncoder(t *testing.T) {
 
 	inputArgs, outputArgs := BuildPresetArgs(presetSoftware, sourceBitrate)
 
-	// Software encoder should have no hwaccel input args
-	if len(inputArgs) != 0 {
-		t.Errorf("expected no hwaccel input args for software encoder, got %v", inputArgs)
+	// Software encoder should have probesize/analyzeduration but no hwaccel input args
+	// Expected: [-probesize 50M -analyzeduration 10M]
+	if len(inputArgs) != 4 {
+		t.Errorf("expected 4 input args (probesize + analyzeduration), got %v", inputArgs)
+	}
+	if len(inputArgs) >= 2 && inputArgs[0] != "-probesize" {
+		t.Errorf("expected first input arg to be -probesize, got %v", inputArgs)
 	}
 
 	// Should use -crf not -b:v
