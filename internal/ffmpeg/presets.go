@@ -158,7 +158,7 @@ func BuildPresetArgs(preset *Preset, sourceBitrate int64) (inputArgs []string, o
 	// Output args
 	outputArgs = []string{}
 
-	// Add scaling filter if needed
+	// Add scaling filter if needed (applies to first video stream)
 	if preset.MaxHeight > 0 {
 		scaleFilter := config.scaleFilter
 		if scaleFilter == "" {
@@ -168,9 +168,6 @@ func BuildPresetArgs(preset *Preset, sourceBitrate int64) (inputArgs []string, o
 			"-vf", fmt.Sprintf("%s=-2:'min(ih,%d)'", scaleFilter, preset.MaxHeight),
 		)
 	}
-
-	// Add encoder
-	outputArgs = append(outputArgs, "-c:v", config.encoder)
 
 	// Get quality setting
 	qualityStr := config.quality
@@ -195,14 +192,22 @@ func BuildPresetArgs(preset *Preset, sourceBitrate int64) (inputArgs []string, o
 		qualityStr = fmt.Sprintf("%dk", targetKbps)
 	}
 
-	outputArgs = append(outputArgs, config.qualityFlag, qualityStr)
-
-	// Add encoder-specific extra args
-	outputArgs = append(outputArgs, config.extraArgs...)
-
-	// Add stream mapping and copy audio/subtitles
+	// Stream mapping: map all streams
+	// Use -c:v copy as default for all video streams, then override stream 0
+	// This handles files with embedded cover art (attached pics) which would
+	// fail to encode due to unsupported frame rates (90k fps)
 	outputArgs = append(outputArgs,
 		"-map", "0",
+		"-c:v", "copy",       // Default: copy all video streams (cover art, etc.)
+		"-c:v:0", config.encoder, // Override: encode only the first video stream
+	)
+
+	// Add quality and encoder-specific args (apply to -c:v:0)
+	outputArgs = append(outputArgs, config.qualityFlag, qualityStr)
+	outputArgs = append(outputArgs, config.extraArgs...)
+
+	// Copy audio and subtitles
+	outputArgs = append(outputArgs,
 		"-c:a", "copy",
 		"-c:s", "copy",
 	)
