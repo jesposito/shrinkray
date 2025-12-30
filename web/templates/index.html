@@ -508,6 +508,96 @@
             overflow-y: auto;
         }
 
+        /* Active Job Panel - Fixed above queue */
+        .active-panel {
+            flex-shrink: 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .active-panel-section {
+            padding: 12px 20px;
+        }
+
+        .active-panel-section + .active-panel-section {
+            border-top: 1px solid var(--border);
+        }
+
+        .active-panel-title {
+            font-size: 0.6875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-tertiary);
+            margin-bottom: 8px;
+        }
+
+        .active-panel-empty {
+            font-size: 0.8125rem;
+            color: var(--text-tertiary);
+            font-style: italic;
+        }
+
+        .active-job {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .active-job-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .active-job-name {
+            font-weight: 500;
+            font-size: 0.875rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .active-job-details {
+            display: flex;
+            gap: 12px;
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+        }
+
+        .up-next-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .up-next-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8125rem;
+        }
+
+        .up-next-name {
+            flex: 1;
+            min-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--text-secondary);
+        }
+
+        .up-next-preset {
+            flex-shrink: 0;
+            font-size: 0.6875rem;
+            padding: 2px 6px;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            color: var(--text-tertiary);
+        }
+
         .job-item {
             padding: 16px 20px;
             border-bottom: 1px solid var(--border);
@@ -1101,6 +1191,18 @@
                             <span>Notify when done</span>
                         </label>
                     </div>
+                    <div class="active-panel" id="active-panel" style="display: none;">
+                        <div class="active-panel-section" id="now-processing-section">
+                            <div class="active-panel-title">Now Processing</div>
+                            <div id="now-processing-content">
+                                <div class="active-panel-empty">No active job</div>
+                            </div>
+                        </div>
+                        <div class="active-panel-section" id="up-next-section" style="display: none;">
+                            <div class="active-panel-title">Up Next</div>
+                            <div class="up-next-list" id="up-next-list"></div>
+                        </div>
+                    </div>
                     <div class="queue-list" id="queue-list">
                         <div class="queue-empty">
                             <div class="queue-empty-icon">
@@ -1220,6 +1322,23 @@
         let currentPath = '';
         let selectedPaths = new Set();
         let eventSource = null;
+        let cachedJobs = [];
+
+        // Escape HTML to prevent XSS
+        function escapeHtml(str) {
+            if (str == null) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        // Escape for CSS selector (job IDs in querySelector)
+        function escapeCssSelector(str) {
+            return String(str).replace(/["\\]/g, '\\$&');
+        }
 
         function formatBytes(bytes) {
             if (bytes === 0) return '0 B';
@@ -1526,6 +1645,7 @@
 
         function updateJobs(jobs) {
             const container = document.getElementById('queue-list');
+            cachedJobs = jobs || [];
 
             if (!jobs || jobs.length === 0) {
                 container.innerHTML = `
@@ -1541,6 +1661,7 @@
                         <div style="font-size: 0.8125rem; margin-top: 4px; color: var(--text-tertiary)">Select files and start transcoding</div>
                     </div>
                 `;
+                updateActivePanel();
                 return;
             }
 
@@ -1569,10 +1690,15 @@
                     `;
                 }
 
+                const safeId = escapeHtml(job.id);
+                const safePath = escapeHtml(job.input_path);
+                const safeFilename = escapeHtml(filename);
+                const safeError = escapeHtml(job.error);
+
                 return `
-                    <div class="job-item">
+                    <div class="job-item" data-job-id="${safeId}">
                         <div class="job-header">
-                            <span class="job-name" title="${job.input_path}">${filename}</span>
+                            <span class="job-name" title="${safePath}">${safeFilename}</span>
                             <div class="job-badges">
                                 <span class="job-badge ${job.is_hardware ? 'hardware' : 'software'}">${job.is_hardware ? 'HW' : 'SW'}</span>
                                 <span class="job-badge ${statusClass}">${statusLabel}</span>
@@ -1581,25 +1707,26 @@
                         ${job.status === 'running' ? `
                             <div class="job-progress">
                                 <div class="progress-bar">
-                                    <div class="progress-fill ${isInitializing ? 'initializing' : ''}" style="width: ${isInitializing ? 100 : job.progress}%"></div>
+                                    <div class="progress-fill ${isInitializing ? 'initializing' : ''}" style="width: ${isInitializing ? 0 : job.progress}%"></div>
                                 </div>
                             </div>
                         ` : ''}
                         <div class="job-details">${detailsHtml}</div>
-                        ${job.status === 'failed' ? `<div class="job-error">${job.error}</div>` : ''}
+                        ${job.status === 'failed' ? `<div class="job-error">${safeError}</div>` : ''}
                         ${job.status === 'pending' || job.status === 'running' ? `
                             <div class="job-actions">
-                                <button class="btn btn-secondary btn-sm" onclick="cancelJob('${job.id}')">Cancel</button>
+                                <button class="btn btn-secondary btn-sm" onclick="cancelJob('${safeId}')">Cancel</button>
                             </div>
                         ` : ''}
                         ${job.status === 'failed' ? `
                             <div class="job-actions">
-                                <button class="btn btn-secondary btn-sm" onclick="retryJob('${job.id}')">Retry</button>
+                                <button class="btn btn-secondary btn-sm" onclick="retryJob('${safeId}')">Retry</button>
                             </div>
                         ` : ''}
                     </div>
                 `;
             }).join('');
+            updateActivePanel();
         }
 
         function updateStats(stats) {
@@ -1607,6 +1734,177 @@
             document.getElementById('stat-running').textContent = stats.running;
             const saved = Math.max(0, stats.total_saved || 0);
             document.getElementById('stat-saved').textContent = formatBytes(saved);
+        }
+
+        function updateActivePanel() {
+            const panel = document.getElementById('active-panel');
+            const nowProcessingContent = document.getElementById('now-processing-content');
+            const upNextSection = document.getElementById('up-next-section');
+            const upNextList = document.getElementById('up-next-list');
+
+            // Find active job (first running job)
+            const activeJob = cachedJobs.find(j => j.status === 'running');
+            // Find pending jobs (up to 5)
+            const pendingJobs = cachedJobs.filter(j => j.status === 'pending').slice(0, 5);
+
+            // If no active job and no pending jobs, hide the panel
+            if (!activeJob && pendingJobs.length === 0) {
+                panel.style.display = 'none';
+                return;
+            }
+
+            panel.style.display = 'block';
+
+            // Update "Now Processing" section
+            if (activeJob) {
+                const filename = activeJob.input_path.split('/').pop();
+                const isInitializing = activeJob.progress === 0 && activeJob.speed === 0;
+                const statusClass = isInitializing ? 'initializing' : 'running';
+                const statusLabel = isInitializing ? 'Initializing' : 'Running';
+
+                const safeId = escapeHtml(activeJob.id);
+                const safePath = escapeHtml(activeJob.input_path);
+                const safeFilename = escapeHtml(filename);
+
+                let detailsHtml = '';
+                if (isInitializing) {
+                    detailsHtml = '<span class="job-detail">Starting encoder...</span>';
+                } else {
+                    detailsHtml = `
+                        <span class="job-detail"><span class="job-detail-value">${activeJob.progress.toFixed(1)}%</span></span>
+                        <span class="job-detail"><span class="job-detail-value">${activeJob.speed.toFixed(2)}x</span></span>
+                        <span class="job-detail">ETA: <span class="job-detail-value">${escapeHtml(activeJob.eta) || '...'}</span></span>
+                    `;
+                }
+
+                nowProcessingContent.innerHTML = `
+                    <div class="active-job">
+                        <div class="active-job-header">
+                            <span class="active-job-name" title="${safePath}">${safeFilename}</span>
+                            <div class="job-badges">
+                                <span class="job-badge ${activeJob.is_hardware ? 'hardware' : 'software'}">${activeJob.is_hardware ? 'HW' : 'SW'}</span>
+                                <span class="job-badge ${statusClass}">${statusLabel}</span>
+                            </div>
+                        </div>
+                        <div class="job-progress">
+                            <div class="progress-bar">
+                                <div class="progress-fill ${isInitializing ? 'initializing' : ''}" style="width: ${isInitializing ? 0 : activeJob.progress}%"></div>
+                            </div>
+                        </div>
+                        <div class="active-job-details">${detailsHtml}</div>
+                        <div class="job-actions">
+                            <button class="btn btn-secondary btn-sm" onclick="cancelJob('${safeId}')">Cancel</button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                nowProcessingContent.innerHTML = '<div class="active-panel-empty">No active job</div>';
+            }
+
+            // Update "Up Next" section
+            if (pendingJobs.length > 0) {
+                upNextSection.style.display = 'block';
+                upNextList.innerHTML = pendingJobs.map(job => {
+                    const filename = job.input_path.split('/').pop();
+                    const presetName = job.preset_id || 'default';
+                    const safePath = escapeHtml(job.input_path);
+                    const safeFilename = escapeHtml(filename);
+                    const safePreset = escapeHtml(presetName);
+                    return `
+                        <div class="up-next-item">
+                            <span class="up-next-name" title="${safePath}">${safeFilename}</span>
+                            <span class="up-next-preset">${safePreset}</span>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                upNextSection.style.display = 'none';
+            }
+        }
+
+        // Targeted update for progress events only - avoids full DOM rebuild
+        function updateActiveJobProgress(jobData) {
+            const isInitializing = jobData.progress === 0 && jobData.speed === 0;
+            const safeEta = escapeHtml(jobData.eta) || '...';
+
+            // Update active panel
+            const nowProcessingContent = document.getElementById('now-processing-content');
+            const activeJobEl = nowProcessingContent ? nowProcessingContent.querySelector('.active-job') : null;
+
+            // If active panel doesn't exist yet, fall back to full refresh
+            if (!activeJobEl) {
+                refreshJobs();
+                return;
+            }
+
+            // Update progress bar in active panel
+            const activeFill = activeJobEl.querySelector('.progress-fill');
+            if (activeFill) {
+                activeFill.style.width = (isInitializing ? 0 : jobData.progress) + '%';
+                activeFill.className = 'progress-fill' + (isInitializing ? ' initializing' : '');
+            }
+
+            // Update details in active panel
+            const activeDetails = activeJobEl.querySelector('.active-job-details');
+            if (activeDetails) {
+                if (isInitializing) {
+                    activeDetails.innerHTML = '<span class="job-detail">Starting encoder...</span>';
+                } else {
+                    activeDetails.innerHTML = `
+                        <span class="job-detail"><span class="job-detail-value">${jobData.progress.toFixed(1)}%</span></span>
+                        <span class="job-detail"><span class="job-detail-value">${jobData.speed.toFixed(2)}x</span></span>
+                        <span class="job-detail">ETA: <span class="job-detail-value">${safeEta}</span></span>
+                    `;
+                }
+            }
+
+            // Update status badge in active panel
+            const activeBadge = activeJobEl.querySelector('.job-badge.running, .job-badge.initializing');
+            if (activeBadge) {
+                activeBadge.className = 'job-badge ' + (isInitializing ? 'initializing' : 'running');
+                activeBadge.textContent = isInitializing ? 'Initializing' : 'Running';
+            }
+
+            // Update the corresponding row in the queue list (use escaped selector)
+            const safeSelector = `.job-item[data-job-id="${escapeCssSelector(jobData.id)}"]`;
+            const queueRow = document.querySelector(safeSelector);
+            if (queueRow) {
+                // Update progress bar
+                const progressFill = queueRow.querySelector('.progress-fill');
+                if (progressFill) {
+                    progressFill.style.width = (isInitializing ? 0 : jobData.progress) + '%';
+                    progressFill.className = 'progress-fill' + (isInitializing ? ' initializing' : '');
+                }
+
+                // Update details
+                const detailsEl = queueRow.querySelector('.job-details');
+                if (detailsEl) {
+                    if (isInitializing) {
+                        detailsEl.innerHTML = '<span class="job-detail">Starting encoder...</span>';
+                    } else {
+                        detailsEl.innerHTML = `
+                            <span class="job-detail"><span class="job-detail-value">${jobData.progress.toFixed(1)}%</span></span>
+                            <span class="job-detail"><span class="job-detail-value">${jobData.speed.toFixed(2)}x</span></span>
+                            <span class="job-detail">ETA: <span class="job-detail-value">${safeEta}</span></span>
+                        `;
+                    }
+                }
+
+                // Update status badge
+                const statusBadge = queueRow.querySelector('.job-badge.running, .job-badge.initializing');
+                if (statusBadge) {
+                    statusBadge.className = 'job-badge ' + (isInitializing ? 'initializing' : 'running');
+                    statusBadge.textContent = isInitializing ? 'Initializing' : 'Running';
+                }
+            }
+
+            // Update cached job data
+            const cachedJob = cachedJobs.find(j => j.id === jobData.id);
+            if (cachedJob) {
+                cachedJob.progress = jobData.progress;
+                cachedJob.speed = jobData.speed;
+                cachedJob.eta = jobData.eta;
+            }
         }
 
         function connectSSE() {
@@ -1622,7 +1920,11 @@
                 } else if (data.type === 'notify_sent') {
                     // Notification was sent, uncheck the checkbox
                     document.getElementById('notify-checkbox').checked = false;
+                } else if (data.type === 'progress' && data.job) {
+                    // Targeted update for progress - avoid full DOM rebuild
+                    updateActiveJobProgress(data.job);
                 } else {
+                    // Full refresh for structural changes (complete, failed, cancelled, etc.)
                     refreshJobs();
                     if (data.type === 'complete' || data.type === 'failed') {
                         browse(currentPath);
