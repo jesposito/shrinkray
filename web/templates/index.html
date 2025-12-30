@@ -1806,6 +1806,21 @@
                 ],
             },
             {
+                id: 'nvenc_session_limit',
+                pattern: /OpenEncodeSessionEx failed.*0x7|maximum simultaneous.*sessions|too many concurrent|InitializeEncoder failed/i,
+                summary: 'NVENC concurrent encoding session limit reached.',
+                confidence: 'high',
+                causes: [
+                    'Consumer NVIDIA GPUs limit concurrent NVENC sessions to 2-3.',
+                    'Multiple workers are trying to use hardware encoding simultaneously.',
+                ],
+                steps: [
+                    'Reduce the number of concurrent workers to 1 when using hardware encoding.',
+                    'Wait for one job to finish before starting another.',
+                    'Use software encoding if you need multiple concurrent jobs.',
+                ],
+            },
+            {
                 id: 'hwaccel_init',
                 pattern: /Failed to initialise NVENC|Cannot load nvcuda|CUDA|VAAPI|videotoolbox.*failed|hwaccel.*failed/i,
                 summary: 'Hardware acceleration initialization failed.',
