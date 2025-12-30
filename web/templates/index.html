@@ -1355,6 +1355,28 @@
         .modal-actions .btn {
             min-width: 100px;
         }
+
+        /* Virtual Scrolling - Only visible items are rendered to DOM */
+        .virtual-scroll-container {
+            position: relative;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        .virtual-scroll-content {
+            position: relative;
+        }
+
+        .virtual-scroll-spacer-top,
+        .virtual-scroll-spacer-bottom {
+            width: 100%;
+        }
+
+        /* When virtual scroll is enabled, job items have fixed height for predictable layout */
+        .queue-list.virtual-scroll-enabled .job-item {
+            min-height: 72px;
+            box-sizing: border-box;
+        }
     </style>
 </head>
 <body>
@@ -1672,7 +1694,165 @@
         const REFRESH_DEBOUNCE_MS = 100; // Max 10 refreshes per second
 
         // Performance: Track stats locally to avoid fetching on every update
-        let cachedStats = { pending: 0, running: 0, complete: 0, failed: 0, total_saved: 0 };
+        let cachedStats = { pending: 0, pending_probe: 0, running: 0, complete: 0, failed: 0, total_saved: 0 };
+
+        // Feature flags (loaded from server config)
+        let featureFlags = {
+            virtual_scroll: false,
+            deferred_probing: false,
+            paginated_init: false,
+            batched_sse: true,
+            delta_progress: true
+        };
+
+        // Virtual scrolling state
+        let virtualScrollEnabled = false;
+        let jobMap = new Map();      // id -> Job object for O(1) lookup
+        let jobOrder = [];           // Array of job IDs in display order
+
+        // Status indexes for O(1) filtering (used by updateActivePanel)
+        const statusIndex = {
+            pending_probe: new Set(),
+            pending: new Set(),
+            running: new Set(),
+            complete: new Set(),
+            failed: new Set(),
+            cancelled: new Set()
+        };
+
+        // Virtual scroll configuration
+        const VIRTUAL_SCROLL_CONFIG = {
+            itemHeight: 72,      // Fixed height per job item in pixels
+            overscan: 5,         // Extra items to render above/below viewport
+            containerSelector: '#queue-list'
+        };
+
+        // Virtual scroll state
+        let visibleRange = { start: 0, end: 20 };
+        let scrollContainer = null;
+
+        // ========================================
+        // Virtual Scroll Implementation
+        // ========================================
+
+        function initVirtualScroll() {
+            if (!virtualScrollEnabled) return;
+
+            scrollContainer = document.querySelector(VIRTUAL_SCROLL_CONFIG.containerSelector);
+            if (!scrollContainer) return;
+
+            scrollContainer.classList.add('virtual-scroll-enabled', 'virtual-scroll-container');
+
+            // Throttled scroll handler
+            let scrollTimeout = null;
+            scrollContainer.addEventListener('scroll', () => {
+                if (scrollTimeout) return;
+                scrollTimeout = setTimeout(() => {
+                    scrollTimeout = null;
+                    updateVisibleRange();
+                }, 16); // ~60fps
+            });
+        }
+
+        function updateVisibleRange() {
+            if (!virtualScrollEnabled || !scrollContainer) return;
+
+            const scrollTop = scrollContainer.scrollTop;
+            const viewportHeight = scrollContainer.clientHeight;
+            const { itemHeight, overscan } = VIRTUAL_SCROLL_CONFIG;
+
+            const newStart = Math.max(0, Math.floor(scrollTop / itemHeight) - overscan);
+            const newEnd = Math.min(
+                jobOrder.length,
+                Math.ceil((scrollTop + viewportHeight) / itemHeight) + overscan
+            );
+
+            if (newStart !== visibleRange.start || newEnd !== visibleRange.end) {
+                visibleRange = { start: newStart, end: newEnd };
+                renderVirtualJobs();
+            }
+        }
+
+        function renderVirtualJobs() {
+            if (!virtualScrollEnabled || !scrollContainer) return;
+
+            const { start, end } = visibleRange;
+            const { itemHeight } = VIRTUAL_SCROLL_CONFIG;
+
+            const topHeight = start * itemHeight;
+            const bottomHeight = Math.max(0, (jobOrder.length - end) * itemHeight);
+
+            const visibleIds = jobOrder.slice(start, end);
+            const visibleJobsHtml = visibleIds.map(id => {
+                const job = jobMap.get(id);
+                return job ? renderJobHtml(job) : '';
+            }).join('');
+
+            scrollContainer.innerHTML = `
+                <div class="virtual-scroll-spacer-top" style="height: ${topHeight}px"></div>
+                ${visibleJobsHtml}
+                <div class="virtual-scroll-spacer-bottom" style="height: ${bottomHeight}px"></div>
+            `;
+        }
+
+        function addJobToVirtualState(job) {
+            jobMap.set(job.id, job);
+            jobOrder.push(job.id);
+            addToStatusIndex(job);
+        }
+
+        function updateJobInVirtualState(job) {
+            const oldJob = jobMap.get(job.id);
+            if (oldJob) {
+                removeFromStatusIndex(oldJob);
+            }
+            jobMap.set(job.id, job);
+            addToStatusIndex(job);
+        }
+
+        function addToStatusIndex(job) {
+            if (statusIndex[job.status]) {
+                statusIndex[job.status].add(job.id);
+            }
+        }
+
+        function removeFromStatusIndex(job) {
+            if (statusIndex[job.status]) {
+                statusIndex[job.status].delete(job.id);
+            }
+        }
+
+        function getJobsByStatus(status) {
+            const ids = statusIndex[status];
+            if (!ids) return [];
+            return Array.from(ids).map(id => jobMap.get(id)).filter(Boolean);
+        }
+
+        function isJobVisible(jobId) {
+            const idx = jobOrder.indexOf(jobId);
+            return idx >= visibleRange.start && idx < visibleRange.end;
+        }
+
+        function updateJobInView(job) {
+            if (!virtualScrollEnabled) return;
+
+            const idx = jobOrder.indexOf(job.id);
+            if (idx >= visibleRange.start && idx < visibleRange.end) {
+                // Job is visible, update its DOM element
+                const localIdx = idx - visibleRange.start;
+                const items = scrollContainer.querySelectorAll('.job-item');
+                if (items[localIdx]) {
+                    items[localIdx].outerHTML = renderJobHtml(job);
+                }
+            }
+        }
+
+        function clearVirtualState() {
+            jobMap.clear();
+            jobOrder = [];
+            Object.values(statusIndex).forEach(set => set.clear());
+            visibleRange = { start: 0, end: 20 };
+        }
 
         // Escape HTML to prevent XSS
         function escapeHtml(str) {
@@ -2461,18 +2641,32 @@
             // Add to cache
             cachedJobs.push(job);
 
-            // Update stats locally
-            cachedStats.pending++;
+            // Update virtual scroll state
+            if (virtualScrollEnabled) {
+                addJobToVirtualState(job);
+            }
+
+            // Update stats locally - handle both pending and pending_probe
+            if (job.status === 'pending') cachedStats.pending++;
+            else if (job.status === 'pending_probe') cachedStats.pending_probe++;
             updateStats(cachedStats);
 
-            // Append to DOM if there are jobs displayed
             const container = document.getElementById('queue-list');
-            if (container.querySelector('.queue-empty')) {
-                // Was empty, need to clear and add
-                container.innerHTML = renderJobHtml(job);
+            if (virtualScrollEnabled) {
+                // Virtual scroll: re-render if new job might be visible
+                scrollContainer = container;
+                if (container.querySelector('.queue-empty')) {
+                    container.innerHTML = '';
+                }
+                updateVisibleRange();
+                renderVirtualJobs();
             } else {
-                // Append new job
-                container.insertAdjacentHTML('beforeend', renderJobHtml(job));
+                // Legacy: append to DOM
+                if (container.querySelector('.queue-empty')) {
+                    container.innerHTML = renderJobHtml(job);
+                } else {
+                    container.insertAdjacentHTML('beforeend', renderJobHtml(job));
+                }
             }
 
             updateActivePanel();
@@ -2486,11 +2680,18 @@
                 const oldStatus = cachedJobs[idx].status;
                 cachedJobs[idx] = job;
 
+                // Update virtual scroll state
+                if (virtualScrollEnabled) {
+                    updateJobInVirtualState(job);
+                }
+
                 // Update stats locally
                 if (oldStatus !== job.status) {
                     if (oldStatus === 'pending') cachedStats.pending--;
+                    if (oldStatus === 'pending_probe') cachedStats.pending_probe--;
                     if (oldStatus === 'running') cachedStats.running--;
                     if (job.status === 'pending') cachedStats.pending++;
+                    if (job.status === 'pending_probe') cachedStats.pending_probe++;
                     if (job.status === 'running') cachedStats.running++;
                     if (job.status === 'complete') {
                         cachedStats.complete++;
@@ -2501,11 +2702,16 @@
                 }
             }
 
-            // Find and update DOM element
-            const safeId = escapeCssSelector(job.id);
-            const el = document.querySelector(`.job-item[data-job-id="${safeId}"]`);
-            if (el) {
-                el.outerHTML = renderJobHtml(job);
+            if (virtualScrollEnabled) {
+                // Virtual scroll: only update if visible
+                updateJobInView(job);
+            } else {
+                // Legacy: find and update DOM element
+                const safeId = escapeCssSelector(job.id);
+                const el = document.querySelector(`.job-item[data-job-id="${safeId}"]`);
+                if (el) {
+                    el.outerHTML = renderJobHtml(job);
+                }
             }
 
             updateActivePanel();
@@ -2514,6 +2720,14 @@
         function updateJobs(jobs) {
             const container = document.getElementById('queue-list');
             cachedJobs = jobs || [];
+
+            // Update virtual scroll state
+            if (virtualScrollEnabled) {
+                clearVirtualState();
+                for (const job of cachedJobs) {
+                    addJobToVirtualState(job);
+                }
+            }
 
             if (!jobs || jobs.length === 0) {
                 container.innerHTML = `
@@ -2533,15 +2747,24 @@
                 return;
             }
 
-            // Performance: Use the extracted renderJobHtml helper
-            container.innerHTML = jobs.map(job => renderJobHtml(job)).join('');
+            if (virtualScrollEnabled) {
+                // Virtual scroll: only render visible items
+                scrollContainer = container;
+                updateVisibleRange();
+                renderVirtualJobs();
+            } else {
+                // Legacy: render all jobs
+                container.innerHTML = jobs.map(job => renderJobHtml(job)).join('');
+            }
             updateActivePanel();
         }
 
         function updateStats(stats) {
             // Cache stats for incremental updates
             cachedStats = { ...stats };
-            document.getElementById('stat-pending').textContent = stats.pending;
+            // pending_probe jobs are shown in the pending count for UI simplicity
+            const totalPending = (stats.pending || 0) + (stats.pending_probe || 0);
+            document.getElementById('stat-pending').textContent = totalPending;
             document.getElementById('stat-running').textContent = stats.running;
             const saved = Math.max(0, stats.total_saved || 0);
             document.getElementById('stat-saved').textContent = formatBytes(saved);
@@ -2553,10 +2776,18 @@
             const upNextSection = document.getElementById('up-next-section');
             const upNextList = document.getElementById('up-next-list');
 
-            // Find running jobs (could be multiple with parallel workers)
-            const runningJobs = cachedJobs.filter(j => j.status === 'running');
-            // Find pending jobs (up to 5)
-            const pendingJobs = cachedJobs.filter(j => j.status === 'pending').slice(0, 5);
+            // Performance: Use status indexes for O(1) lookup when virtual scroll is enabled
+            let runningJobs, pendingJobs;
+            if (virtualScrollEnabled) {
+                runningJobs = getJobsByStatus('running');
+                // Include both pending and pending_probe in "up next"
+                const pendingIds = [...statusIndex.pending, ...statusIndex.pending_probe];
+                pendingJobs = pendingIds.slice(0, 5).map(id => jobMap.get(id)).filter(Boolean);
+            } else {
+                // Legacy O(N) filtering
+                runningJobs = cachedJobs.filter(j => j.status === 'running');
+                pendingJobs = cachedJobs.filter(j => j.status === 'pending' || j.status === 'pending_probe').slice(0, 5);
+            }
 
             // If no running jobs and no pending jobs, hide the panel
             if (runningJobs.length === 0 && pendingJobs.length === 0) {
@@ -2742,24 +2973,38 @@
         function handleBatchAdded(jobs) {
             if (!jobs || jobs.length === 0) return;
 
-            // Add all jobs to cache
+            // Add all jobs to cache and virtual scroll state
             for (const job of jobs) {
                 cachedJobs.push(job);
+                if (virtualScrollEnabled) {
+                    addJobToVirtualState(job);
+                }
             }
 
-            // Update stats - all batch_added jobs are pending (skipped ones come as separate "failed" events)
-            cachedStats.pending += jobs.length;
+            // Update stats - handle both pending and pending_probe
+            for (const job of jobs) {
+                if (job.status === 'pending') cachedStats.pending++;
+                else if (job.status === 'pending_probe') cachedStats.pending_probe++;
+            }
             updateStats(cachedStats);
 
-            // Render all jobs to DOM in a single operation
             const container = document.getElementById('queue-list');
-            if (container.querySelector('.queue-empty')) {
-                // Was empty, replace with jobs
-                container.innerHTML = jobs.map(job => renderJobHtml(job)).join('');
+            if (virtualScrollEnabled) {
+                // Virtual scroll: re-render visible range
+                scrollContainer = container;
+                if (container.querySelector('.queue-empty')) {
+                    container.innerHTML = '';
+                }
+                updateVisibleRange();
+                renderVirtualJobs();
             } else {
-                // Append all jobs at once (single DOM operation)
-                const fragment = jobs.map(job => renderJobHtml(job)).join('');
-                container.insertAdjacentHTML('beforeend', fragment);
+                // Legacy: render all jobs to DOM in a single operation
+                if (container.querySelector('.queue-empty')) {
+                    container.innerHTML = jobs.map(job => renderJobHtml(job)).join('');
+                } else {
+                    const fragment = jobs.map(job => renderJobHtml(job)).join('');
+                    container.insertAdjacentHTML('beforeend', fragment);
+                }
             }
 
             updateActivePanel();
@@ -2931,6 +3176,15 @@
                 const unicornEnabled = localStorage.getItem('shrinkray-unicorn') === 'true';
                 document.getElementById('setting-unicorn-mode').checked = unicornEnabled;
                 updateStartButtonText();
+
+                // Feature flags - initialize virtual scrolling if enabled
+                if (config.features) {
+                    if (config.features.virtual_scroll && !virtualScrollEnabled) {
+                        virtualScrollEnabled = true;
+                        console.log('[perf] Virtual scrolling enabled via feature flag');
+                        initVirtualScroll();
+                    }
+                }
             } catch (err) {
                 console.error('Load settings error:', err);
             }

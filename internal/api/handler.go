@@ -229,15 +229,23 @@ func (h *Handler) ClearQueue(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 	// Return a sanitized config (no sensitive paths exposed)
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"version":               shrinkray.Version,
-		"media_path":            h.cfg.MediaPath,
-		"original_handling":     h.cfg.OriginalHandling,
-		"workers":               h.cfg.Workers,
-		"has_temp_path":         h.cfg.TempPath != "",
-		"pushover_user_key":     h.cfg.PushoverUserKey,
-		"pushover_app_token":    h.cfg.PushoverAppToken,
-		"pushover_configured":   h.pushover.IsConfigured(),
-		"notify_on_complete":    h.cfg.NotifyOnComplete,
+		"version":             shrinkray.Version,
+		"media_path":          h.cfg.MediaPath,
+		"original_handling":   h.cfg.OriginalHandling,
+		"workers":             h.cfg.Workers,
+		"has_temp_path":       h.cfg.TempPath != "",
+		"pushover_user_key":   h.cfg.PushoverUserKey,
+		"pushover_app_token":  h.cfg.PushoverAppToken,
+		"pushover_configured": h.pushover.IsConfigured(),
+		"notify_on_complete":  h.cfg.NotifyOnComplete,
+		// Feature flags for frontend
+		"features": map[string]bool{
+			"virtual_scroll":   h.cfg.Features.VirtualScroll,
+			"deferred_probing": h.cfg.Features.DeferredProbing,
+			"paginated_init":   h.cfg.Features.PaginatedInit,
+			"batched_sse":      h.cfg.Features.BatchedSSE,
+			"delta_progress":   h.cfg.Features.DeltaProgress,
+		},
 	})
 }
 
