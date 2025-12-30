@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"sort"
 	"sync"
@@ -283,6 +284,10 @@ func (w *Worker) processJob(job *Job) {
 		softwarePreset := *preset
 		softwarePreset.Encoder = ffmpeg.HWAccelNone
 		preset = &softwarePreset
+		log.Printf("[worker-%d] Starting job %s with SOFTWARE fallback for: %s", w.id, job.ID, job.InputPath)
+	} else {
+		log.Printf("[worker-%d] Starting job %s with encoder=%s codec=%s for: %s",
+			w.id, job.ID, preset.Encoder, preset.Codec, job.InputPath)
 	}
 
 	// Build temp output path

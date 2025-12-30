@@ -2,6 +2,7 @@ package ffmpeg
 
 import (
 	"context"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -147,6 +148,8 @@ func DetectEncoders(ffmpegPath string) map[EncoderKey]*HWEncoder {
 		return copyEncoders(availableEncoders.encoders)
 	}
 
+	log.Println("[encoder-detect] Starting hardware encoder detection...")
+
 	// Get list of available encoders from ffmpeg
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -154,6 +157,7 @@ func DetectEncoders(ffmpegPath string) map[EncoderKey]*HWEncoder {
 	cmd := exec.CommandContext(ctx, ffmpegPath, "-encoders", "-hide_banner")
 	output, err := cmd.Output()
 	if err != nil {
+		log.Printf("[encoder-detect] Failed to query ffmpeg encoders: %v", err)
 		// Fallback to software only
 		availableEncoders.encoders[EncoderKey{HWAccelNone, CodecHEVC}] = &HWEncoder{
 			Accel:       HWAccelNone,
@@ -176,6 +180,7 @@ func DetectEncoders(ffmpegPath string) map[EncoderKey]*HWEncoder {
 
 		// First check if encoder exists in ffmpeg
 		if !strings.Contains(encoderList, enc.Encoder) {
+			log.Printf("[encoder-detect] %s: not listed in ffmpeg", enc.Encoder)
 			encCopy.Available = false
 			availableEncoders.encoders[key] = &encCopy
 			continue
@@ -183,12 +188,28 @@ func DetectEncoders(ffmpegPath string) map[EncoderKey]*HWEncoder {
 
 		if enc.Accel == HWAccelNone {
 			// Software encoders - just check if listed in ffmpeg
+			log.Printf("[encoder-detect] %s: available (software)", enc.Encoder)
 			encCopy.Available = true
 		} else {
 			// Hardware encoders - actually test if they work
-			encCopy.Available = testEncoder(ffmpegPath, enc.Encoder)
+			available := testEncoder(ffmpegPath, enc.Encoder)
+			if available {
+				log.Printf("[encoder-detect] %s: AVAILABLE (test encode passed)", enc.Encoder)
+			} else {
+				log.Printf("[encoder-detect] %s: not available (test encode failed)", enc.Encoder)
+			}
+			encCopy.Available = available
 		}
 		availableEncoders.encoders[key] = &encCopy
+	}
+
+	// Log summary of detected encoders
+	log.Println("[encoder-detect] Detection complete. Available encoders:")
+	for _, codec := range []Codec{CodecHEVC, CodecAV1} {
+		best := getBestEncoderForCodecInternal(availableEncoders.encoders, codec)
+		if best != nil {
+			log.Printf("[encoder-detect]   %s: %s (%s)", codec, best.Name, best.Encoder)
+		}
 	}
 
 	availableEncoders.detected = true
@@ -226,6 +247,15 @@ func testEncoder(ffmpegPath string, encoder string) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	// For NVENC encoders, first check if NVIDIA GPU is actually present
+	// This prevents false positives when CUDA libraries are installed but no GPU exists
+	if strings.Contains(encoder, "nvenc") {
+		if !hasNVIDIADevice() {
+			log.Printf("[encoder-detect] %s: skipped (no NVIDIA device found)", encoder)
+			return false
+		}
+	}
+
 	// Build base args
 	args := []string{
 		"-f", "lavfi",
@@ -253,9 +283,40 @@ func testEncoder(ffmpegPath string, encoder string) bool {
 	// Note: Use 256x256 resolution - some hardware encoders (QSV) have minimum resolution requirements
 	cmd := exec.CommandContext(ctx, ffmpegPath, args...)
 
-	// We don't care about output, just whether it succeeds
-	err := cmd.Run()
-	return err == nil
+	// Capture stderr to check for specific errors
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// Log the failure reason for debugging
+		log.Printf("[encoder-detect] %s test failed: %v (output: %s)",
+			encoder, err, truncateOutput(string(output), 200))
+		return false
+	}
+	return true
+}
+
+// hasNVIDIADevice checks if an NVIDIA GPU is present in the system
+func hasNVIDIADevice() bool {
+	// Check for NVIDIA device files
+	if _, err := os.Stat("/dev/nvidia0"); err == nil {
+		return true
+	}
+	// Check for nvidia-smi
+	if _, err := exec.LookPath("nvidia-smi"); err == nil {
+		cmd := exec.Command("nvidia-smi", "-L")
+		if err := cmd.Run(); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+// truncateOutput truncates a string to maxLen characters for logging
+func truncateOutput(s string, maxLen int) string {
+	s = strings.ReplaceAll(s, "\n", " ")
+	if len(s) > maxLen {
+		return s[:maxLen] + "..."
+	}
+	return s
 }
 
 // GetAvailableEncoders returns all detected encoders (must call DetectEncoders first)
@@ -294,15 +355,29 @@ func IsEncoderAvailableForCodec(accel HWAccel, codec Codec) bool {
 	return enc != nil && enc.Available
 }
 
-// GetBestEncoderForCodec returns the best available encoder for a given codec (prefer hardware)
-func GetBestEncoderForCodec(codec Codec) *HWEncoder {
+// getBestEncoderForCodecInternal returns the best encoder from a given map (for internal use)
+func getBestEncoderForCodecInternal(encoders map[EncoderKey]*HWEncoder, codec Codec) *HWEncoder {
 	// Priority: VideoToolbox > NVENC > QSV > VAAPI > Software
 	priority := []HWAccel{HWAccelVideoToolbox, HWAccelNVENC, HWAccelQSV, HWAccelVAAPI, HWAccelNone}
 
 	for _, accel := range priority {
-		if IsEncoderAvailableForCodec(accel, codec) {
-			return GetEncoderByKey(accel, codec)
+		key := EncoderKey{accel, codec}
+		if enc, ok := encoders[key]; ok && enc.Available {
+			return enc
 		}
+	}
+	return nil
+}
+
+// GetBestEncoderForCodec returns the best available encoder for a given codec (prefer hardware)
+func GetBestEncoderForCodec(codec Codec) *HWEncoder {
+	availableEncoders.mu.RLock()
+	defer availableEncoders.mu.RUnlock()
+
+	enc := getBestEncoderForCodecInternal(availableEncoders.encoders, codec)
+	if enc != nil {
+		encCopy := *enc
+		return &encCopy
 	}
 
 	// Fallback to software

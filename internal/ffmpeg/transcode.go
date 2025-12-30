@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -226,6 +227,9 @@ func (t *Transcoder) Transcode(
 	)
 	args = append(args, outputArgs...)
 	args = append(args, outputPath)
+
+	// Log the ffmpeg command for debugging
+	log.Printf("[transcode] Running: ffmpeg %s", strings.Join(args, " "))
 
 	cmd := exec.CommandContext(ctx, t.ffmpegPath, args...)
 
