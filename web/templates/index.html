@@ -1666,6 +1666,14 @@
         let eventSource = null;
         let cachedJobs = [];
 
+        // Performance: Debounce refresh calls to avoid DOM thrashing
+        let refreshDebounceTimer = null;
+        let pendingRefreshNeeded = false;
+        const REFRESH_DEBOUNCE_MS = 100; // Max 10 refreshes per second
+
+        // Performance: Track stats locally to avoid fetching on every update
+        let cachedStats = { pending: 0, running: 0, complete: 0, failed: 0, total_saved: 0 };
+
         // Escape HTML to prevent XSS
         function escapeHtml(str) {
             if (str == null) return '';
@@ -2358,6 +2366,20 @@
             closeConfirmModal();
         });
 
+        // Performance: Debounced refresh - batches multiple rapid updates
+        function debouncedRefreshJobs() {
+            pendingRefreshNeeded = true;
+            if (refreshDebounceTimer) return; // Already scheduled
+
+            refreshDebounceTimer = setTimeout(() => {
+                refreshDebounceTimer = null;
+                if (pendingRefreshNeeded) {
+                    pendingRefreshNeeded = false;
+                    refreshJobs();
+                }
+            }, REFRESH_DEBOUNCE_MS);
+        }
+
         async function refreshJobs() {
             try {
                 const resp = await fetch('/api/jobs');
@@ -2367,6 +2389,126 @@
             } catch (err) {
                 console.error('Refresh error:', err);
             }
+        }
+
+        // Performance: Render a single job item HTML (extracted for reuse)
+        function renderJobHtml(job) {
+            const filename = job.input_path.split('/').pop();
+            const isInitializing = job.status === 'running' && job.progress === 0 && job.speed === 0;
+            const statusClass = isInitializing ? 'initializing' : job.status;
+            const statusLabel = isInitializing ? 'Initializing' : job.status.charAt(0).toUpperCase() + job.status.slice(1);
+
+            let detailsHtml = '';
+            if (job.status === 'running') {
+                if (isInitializing) {
+                    detailsHtml = '<span class="job-detail">Starting encoder...</span>';
+                } else {
+                    detailsHtml = `
+                        <span class="job-detail"><span class="job-detail-value">${job.progress.toFixed(1)}%</span></span>
+                        <span class="job-detail"><span class="job-detail-value">${job.speed.toFixed(2)}x</span></span>
+                        <span class="job-detail">ETA: <span class="job-detail-value">${job.eta || '...'}</span></span>
+                    `;
+                }
+            } else if (job.status === 'complete') {
+                detailsHtml = `
+                    <span class="job-detail job-saved">Saved <span class="job-detail-value">${formatBytes(job.space_saved)}</span></span>
+                    <span class="job-detail">${formatBytes(job.input_size)} → ${formatBytes(job.output_size)}</span>
+                    ${job.transcode_secs ? `<span class="job-detail">in <span class="job-detail-value">${formatDuration(job.transcode_secs)}</span></span>` : ''}
+                `;
+            }
+
+            const safeId = escapeHtml(job.id);
+            const safePath = escapeHtml(job.input_path);
+            const safeFilename = escapeHtml(filename);
+            const safeError = escapeHtml(job.error);
+
+            return `
+                <div class="job-item" data-job-id="${safeId}">
+                    <div class="job-header">
+                        <span class="job-name" title="${safePath}">${safeFilename}</span>
+                        <div class="job-badges">
+                            ${job.is_software_fallback ? '<span class="job-badge retry">Retry</span>' : ''}
+                            <span class="job-badge ${job.is_hardware ? 'hardware' : 'software'}">${job.is_hardware ? 'HW' : 'SW'}</span>
+                            <span class="job-badge ${statusClass}">${statusLabel}</span>
+                        </div>
+                    </div>
+                    ${job.status === 'running' ? `
+                        <div class="job-progress">
+                            <div class="progress-bar">
+                                <div class="progress-fill ${isInitializing ? 'initializing' : ''}" style="width: ${isInitializing ? 0 : job.progress}%"></div>
+                            </div>
+                        </div>
+                    ` : ''}
+                    <div class="job-details">${detailsHtml}</div>
+                    ${job.status === 'failed' ? `<div class="job-error">${safeError}</div>` : ''}
+                    ${job.status === 'failed' ? renderErrorHelper(job) : ''}
+                    ${job.status === 'pending' || job.status === 'running' ? `
+                        <div class="job-actions">
+                            <button class="btn btn-secondary btn-sm" onclick="cancelJob('${safeId}')">Cancel</button>
+                        </div>
+                    ` : ''}
+                    ${job.status === 'failed' ? `
+                        <div class="job-actions">
+                            <button class="btn btn-secondary btn-sm" onclick="retryJob('${safeId}')">Retry</button>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        // Performance: Handle 'added' event by appending to DOM instead of full rebuild
+        function handleJobAdded(job) {
+            // Add to cache
+            cachedJobs.push(job);
+
+            // Update stats locally
+            cachedStats.pending++;
+            updateStats(cachedStats);
+
+            // Append to DOM if there are jobs displayed
+            const container = document.getElementById('queue-list');
+            if (container.querySelector('.queue-empty')) {
+                // Was empty, need to clear and add
+                container.innerHTML = renderJobHtml(job);
+            } else {
+                // Append new job
+                container.insertAdjacentHTML('beforeend', renderJobHtml(job));
+            }
+
+            updateActivePanel();
+        }
+
+        // Performance: Handle status change by updating single DOM element
+        function handleJobStatusChange(job) {
+            // Update in cache
+            const idx = cachedJobs.findIndex(j => j.id === job.id);
+            if (idx >= 0) {
+                const oldStatus = cachedJobs[idx].status;
+                cachedJobs[idx] = job;
+
+                // Update stats locally
+                if (oldStatus !== job.status) {
+                    if (oldStatus === 'pending') cachedStats.pending--;
+                    if (oldStatus === 'running') cachedStats.running--;
+                    if (job.status === 'pending') cachedStats.pending++;
+                    if (job.status === 'running') cachedStats.running++;
+                    if (job.status === 'complete') {
+                        cachedStats.complete++;
+                        cachedStats.total_saved += job.space_saved || 0;
+                    }
+                    if (job.status === 'failed') cachedStats.failed++;
+                    updateStats(cachedStats);
+                }
+            }
+
+            // Find and update DOM element
+            const safeId = escapeCssSelector(job.id);
+            const el = document.querySelector(`.job-item[data-job-id="${safeId}"]`);
+            if (el) {
+                el.outerHTML = renderJobHtml(job);
+            }
+
+            updateActivePanel();
         }
 
         function updateJobs(jobs) {
@@ -2391,73 +2533,14 @@
                 return;
             }
 
-            container.innerHTML = jobs.map(job => {
-                const filename = job.input_path.split('/').pop();
-                const isInitializing = job.status === 'running' && job.progress === 0 && job.speed === 0;
-                const statusClass = isInitializing ? 'initializing' : job.status;
-                const statusLabel = isInitializing ? 'Initializing' : job.status.charAt(0).toUpperCase() + job.status.slice(1);
-
-                let detailsHtml = '';
-                if (job.status === 'running') {
-                    if (isInitializing) {
-                        detailsHtml = '<span class="job-detail">Starting encoder...</span>';
-                    } else {
-                        detailsHtml = `
-                            <span class="job-detail"><span class="job-detail-value">${job.progress.toFixed(1)}%</span></span>
-                            <span class="job-detail"><span class="job-detail-value">${job.speed.toFixed(2)}x</span></span>
-                            <span class="job-detail">ETA: <span class="job-detail-value">${job.eta || '...'}</span></span>
-                        `;
-                    }
-                } else if (job.status === 'complete') {
-                    detailsHtml = `
-                        <span class="job-detail job-saved">Saved <span class="job-detail-value">${formatBytes(job.space_saved)}</span></span>
-                        <span class="job-detail">${formatBytes(job.input_size)} → ${formatBytes(job.output_size)}</span>
-                        ${job.transcode_secs ? `<span class="job-detail">in <span class="job-detail-value">${formatDuration(job.transcode_secs)}</span></span>` : ''}
-                    `;
-                }
-
-                const safeId = escapeHtml(job.id);
-                const safePath = escapeHtml(job.input_path);
-                const safeFilename = escapeHtml(filename);
-                const safeError = escapeHtml(job.error);
-
-                return `
-                    <div class="job-item" data-job-id="${safeId}">
-                        <div class="job-header">
-                            <span class="job-name" title="${safePath}">${safeFilename}</span>
-                            <div class="job-badges">
-                                ${job.is_software_fallback ? '<span class="job-badge retry">Retry</span>' : ''}
-                                <span class="job-badge ${job.is_hardware ? 'hardware' : 'software'}">${job.is_hardware ? 'HW' : 'SW'}</span>
-                                <span class="job-badge ${statusClass}">${statusLabel}</span>
-                            </div>
-                        </div>
-                        ${job.status === 'running' ? `
-                            <div class="job-progress">
-                                <div class="progress-bar">
-                                    <div class="progress-fill ${isInitializing ? 'initializing' : ''}" style="width: ${isInitializing ? 0 : job.progress}%"></div>
-                                </div>
-                            </div>
-                        ` : ''}
-                        <div class="job-details">${detailsHtml}</div>
-                        ${job.status === 'failed' ? `<div class="job-error">${safeError}</div>` : ''}
-                        ${job.status === 'failed' ? renderErrorHelper(job) : ''}
-                        ${job.status === 'pending' || job.status === 'running' ? `
-                            <div class="job-actions">
-                                <button class="btn btn-secondary btn-sm" onclick="cancelJob('${safeId}')">Cancel</button>
-                            </div>
-                        ` : ''}
-                        ${job.status === 'failed' ? `
-                            <div class="job-actions">
-                                <button class="btn btn-secondary btn-sm" onclick="retryJob('${safeId}')">Retry</button>
-                            </div>
-                        ` : ''}
-                    </div>
-                `;
-            }).join('');
+            // Performance: Use the extracted renderJobHtml helper
+            container.innerHTML = jobs.map(job => renderJobHtml(job)).join('');
             updateActivePanel();
         }
 
         function updateStats(stats) {
+            // Cache stats for incremental updates
+            cachedStats = { ...stats };
             document.getElementById('stat-pending').textContent = stats.pending;
             document.getElementById('stat-running').textContent = stats.running;
             const saved = Math.max(0, stats.total_saved || 0);
@@ -2669,13 +2752,19 @@
                 } else if (data.type === 'progress' && data.job) {
                     // Targeted update for progress - avoid full DOM rebuild
                     updateActiveJobProgress(data.job);
-                } else {
-                    // Full refresh for structural changes (complete, failed, cancelled, etc.)
-                    refreshJobs();
+                } else if (data.type === 'added' && data.job) {
+                    // Performance: Append new job instead of full refresh
+                    handleJobAdded(data.job);
+                } else if ((data.type === 'started' || data.type === 'complete' || data.type === 'failed' || data.type === 'cancelled') && data.job) {
+                    // Performance: Update single job instead of full refresh
+                    handleJobStatusChange(data.job);
                     if (data.type === 'complete' || data.type === 'failed') {
                         // Refresh file list to update metadata, but preserve selections
                         browse(currentPath, true);
                     }
+                } else {
+                    // Fallback: debounced full refresh for unknown event types
+                    debouncedRefreshJobs();
                 }
             };
 
