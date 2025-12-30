@@ -5,7 +5,7 @@ A simple video transcoding tool for Unraid. Select a folder, pick a preset, and 
 ## Quick Start (Unraid)
 
 1. Install from Community Applications (search "Shrinkray") or add manually:
-   - **Repository**: `ghcr.io/gwlsn/shrinkray:latest`
+   - **Repository**: `ghcr.io/jesposito/shrinkray:latest`
    - **WebUI**: `8080`
    - **Volumes**: `/config` → appdata, `/media` → your media library
    - **Optional**: `/temp` → fast storage for temp file
@@ -22,7 +22,7 @@ docker run -d \
   -e PGID=100 \
   -v /path/to/config:/config \
   -v /path/to/media:/media \
-  ghcr.io/gwlsn/shrinkray:latest
+  ghcr.io/jesposito/shrinkray:latest
 ```
 
 **Optional**: For better performance, mount fast storage for temp files:
@@ -113,3 +113,42 @@ go build -o shrinkray ./cmd/shrinkray
 ```
 
 Requires Go 1.22+ and FFmpeg with HEVC/AV1 support.
+
+## Docker Image Publishing
+
+The Docker image is automatically built and published to GitHub Container Registry (GHCR) when changes are pushed to the `main` branch.
+
+**Image URL**: `ghcr.io/jesposito/shrinkray:latest`
+
+**Available Tags**:
+- `latest` - Always points to the most recent build from main
+- `<sha>` - Short git commit SHA for specific versions (e.g., `ghcr.io/jesposito/shrinkray:abc1234`)
+
+### Making the Package Public (Required for Unraid)
+
+By default, GHCR packages are private. To allow Unraid to pull the image without authentication:
+
+1. Go to your GitHub profile → **Packages**
+2. Click on the `shrinkray` package
+3. Click **Package settings** (right sidebar)
+4. Scroll to **Danger Zone** → Click **Change visibility**
+5. Select **Public** and confirm
+
+### Unraid Setup
+
+Use this exact image name in Unraid:
+
+```
+ghcr.io/jesposito/shrinkray:latest
+```
+
+Add a new container in Unraid with:
+- **Repository**: `ghcr.io/jesposito/shrinkray:latest`
+- **WebUI**: `http://[IP]:[PORT:8080]`
+- **Port**: `8080` → `8080`
+- **Path**: `/config` → `/mnt/user/appdata/shrinkray`
+- **Path**: `/media` → `/mnt/user/` (or your media location)
+
+For hardware acceleration, add the appropriate device mapping:
+- Intel/AMD: `/dev/dri` → `/dev/dri`
+- NVIDIA: Enable `--runtime=nvidia` with the Nvidia-Driver plugin
