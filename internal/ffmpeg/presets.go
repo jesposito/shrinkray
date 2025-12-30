@@ -62,10 +62,10 @@ var encoderConfigs = map[EncoderKey]encoderSettings{
 		qualityFlag: "-global_quality",
 		quality:     "27",
 		extraArgs:   []string{"-preset", "medium"},
-		// Use VAAPI for hardware decode - works better than QSV decode on HEVC with PGS subtitles
-		// QSV decode hangs, but VAAPI decode works fine and still uses GPU
-		hwaccelArgs: []string{"-hwaccel", "vaapi", "-hwaccel_device", ""}, // Device filled dynamically
-		scaleFilter: "scale",
+		// Full VAAPI decode pipeline - keeps frames in GPU memory
+		// On Intel GPUs, QSV can access VAAPI surfaces directly
+		hwaccelArgs: []string{"-hwaccel", "vaapi", "-hwaccel_device", "", "-hwaccel_output_format", "vaapi"},
+		scaleFilter: "scale_vaapi",
 	},
 	{HWAccelVAAPI, CodecHEVC}: {
 		encoder:     "hevc_vaapi",
@@ -108,10 +108,10 @@ var encoderConfigs = map[EncoderKey]encoderSettings{
 		qualityFlag: "-global_quality",
 		quality:     "32",
 		extraArgs:   []string{"-preset", "medium"},
-		// Use VAAPI for hardware decode - works better than QSV decode on HEVC with PGS subtitles
-		// QSV decode hangs, but VAAPI decode works fine and still uses GPU
-		hwaccelArgs: []string{"-hwaccel", "vaapi", "-hwaccel_device", ""}, // Device filled dynamically
-		scaleFilter: "scale",
+		// Full VAAPI decode pipeline - keeps frames in GPU memory
+		// On Intel GPUs, QSV can access VAAPI surfaces directly
+		hwaccelArgs: []string{"-hwaccel", "vaapi", "-hwaccel_device", "", "-hwaccel_output_format", "vaapi"},
+		scaleFilter: "scale_vaapi",
 	},
 	{HWAccelVAAPI, CodecAV1}: {
 		encoder:     "av1_vaapi",
