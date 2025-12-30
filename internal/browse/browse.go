@@ -2,6 +2,7 @@ package browse
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -187,6 +188,7 @@ func (b *Browser) getProbeResult(ctx context.Context, path string) *ffmpeg.Probe
 	// Probe the file
 	result, err := b.prober.Probe(ctx, path)
 	if err != nil {
+		fmt.Printf("Probe failed for %s: %v\n", filepath.Base(path), err)
 		return nil
 	}
 
