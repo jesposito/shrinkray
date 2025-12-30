@@ -62,10 +62,10 @@ var encoderConfigs = map[EncoderKey]encoderSettings{
 		qualityFlag: "-global_quality",
 		quality:     "27",
 		extraArgs:   []string{"-preset", "medium"},
-		// Full VAAPI decode pipeline - keeps frames in GPU memory
-		// On Intel GPUs, QSV can access VAAPI surfaces directly
-		hwaccelArgs: []string{"-hwaccel", "vaapi", "-hwaccel_device", "", "-hwaccel_output_format", "vaapi"},
-		scaleFilter: "scale_vaapi",
+		// VAAPI decode with CPU frame transfer to QSV encoder
+		// Some CPU overhead but reliable - full GPU pipeline didn't work
+		hwaccelArgs: []string{"-hwaccel", "vaapi", "-hwaccel_device", ""},
+		scaleFilter: "scale",
 	},
 	{HWAccelVAAPI, CodecHEVC}: {
 		encoder:     "hevc_vaapi",
@@ -108,10 +108,10 @@ var encoderConfigs = map[EncoderKey]encoderSettings{
 		qualityFlag: "-global_quality",
 		quality:     "32",
 		extraArgs:   []string{"-preset", "medium"},
-		// Full VAAPI decode pipeline - keeps frames in GPU memory
-		// On Intel GPUs, QSV can access VAAPI surfaces directly
-		hwaccelArgs: []string{"-hwaccel", "vaapi", "-hwaccel_device", "", "-hwaccel_output_format", "vaapi"},
-		scaleFilter: "scale_vaapi",
+		// VAAPI decode with CPU frame transfer to QSV encoder
+		// Some CPU overhead but reliable - full GPU pipeline didn't work
+		hwaccelArgs: []string{"-hwaccel", "vaapi", "-hwaccel_device", ""},
+		scaleFilter: "scale",
 	},
 	{HWAccelVAAPI, CodecAV1}: {
 		encoder:     "av1_vaapi",
