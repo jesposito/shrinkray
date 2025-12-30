@@ -705,6 +705,15 @@
             color: var(--text-secondary);
         }
 
+        .job-badge.retry {
+            background: #FEF3C7;
+            color: #D97706;
+        }
+        [data-theme="dark"] .job-badge.retry {
+            background: #78350F;
+            color: #FCD34D;
+        }
+
         .job-progress {
             margin: 12px 0;
         }
@@ -2384,6 +2393,7 @@
                         <div class="job-header">
                             <span class="job-name" title="${safePath}">${safeFilename}</span>
                             <div class="job-badges">
+                                ${job.is_software_fallback ? '<span class="job-badge retry">Retry</span>' : ''}
                                 <span class="job-badge ${job.is_hardware ? 'hardware' : 'software'}">${job.is_hardware ? 'HW' : 'SW'}</span>
                                 <span class="job-badge ${statusClass}">${statusLabel}</span>
                             </div>
@@ -2468,6 +2478,7 @@
                             <div class="job-header">
                                 <span class="job-name" title="${safePath}">${safeFilename}</span>
                                 <div class="job-badges">
+                                    ${job.is_software_fallback ? '<span class="job-badge retry">Retry</span>' : ''}
                                     <span class="job-badge ${job.is_hardware ? 'hardware' : 'software'}">${job.is_hardware ? 'HW' : 'SW'}</span>
                                     <span class="job-badge ${statusClass}">${statusLabel}</span>
                                 </div>
@@ -2503,6 +2514,7 @@
                             <div class="job-header">
                                 <span class="job-name" title="${safePath}">${safeFilename}</span>
                                 <div class="job-badges">
+                                    ${job.is_software_fallback ? '<span class="job-badge retry">Retry</span>' : ''}
                                     <span class="job-badge ${job.is_hardware ? 'hardware' : 'software'}">${job.is_hardware ? 'HW' : 'SW'}</span>
                                     <span class="job-badge pending">Pending</span>
                                 </div>

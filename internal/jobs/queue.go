@@ -21,15 +21,19 @@ type Queue struct {
 	// Subscribers for job events
 	subsMu      sync.RWMutex
 	subscribers map[chan JobEvent]struct{}
+
+	// Rate limiting for hardware fallbacks to prevent queue explosion
+	fallbackTimes []time.Time // Timestamps of recent fallback creations
 }
 
 // NewQueue creates a new job queue, optionally loading from a persistence file
 func NewQueue(filePath string) (*Queue, error) {
 	q := &Queue{
-		jobs:        make(map[string]*Job),
-		order:       make([]string, 0),
-		filePath:    filePath,
-		subscribers: make(map[chan JobEvent]struct{}),
+		jobs:          make(map[string]*Job),
+		order:         make([]string, 0),
+		filePath:      filePath,
+		subscribers:   make(map[chan JobEvent]struct{}),
+		fallbackTimes: make([]time.Time, 0),
 	}
 
 	// Try to load existing queue
@@ -194,12 +198,36 @@ func (q *Queue) AddMultiple(probes []*ffmpeg.ProbeResult, presetID string) ([]*J
 	return jobs, nil
 }
 
+// Fallback rate limit constants
+const (
+	fallbackRateLimitWindow = 5 * time.Minute // Time window for rate limiting
+	fallbackRateLimitMax    = 5               // Max fallbacks in window before pausing
+)
+
 // AddSoftwareFallback creates a new job using software encoding after a hardware
 // encoder failure. The new job references the original failed job and is marked
-// as a software fallback for visibility.
+// as a software fallback for visibility. Returns nil if rate limited.
 func (q *Queue) AddSoftwareFallback(originalJob *Job, fallbackReason string) *Job {
 	q.mu.Lock()
 	defer q.mu.Unlock()
+
+	// Rate limit: clean up old timestamps and check limit
+	now := time.Now()
+	cutoff := now.Add(-fallbackRateLimitWindow)
+	validTimes := make([]time.Time, 0, len(q.fallbackTimes))
+	for _, t := range q.fallbackTimes {
+		if t.After(cutoff) {
+			validTimes = append(validTimes, t)
+		}
+	}
+	q.fallbackTimes = validTimes
+
+	// If too many fallbacks recently, refuse to create another
+	if len(q.fallbackTimes) >= fallbackRateLimitMax {
+		fmt.Printf("Warning: hardware fallback rate limit reached (%d in %v), skipping auto-retry\n",
+			fallbackRateLimitMax, fallbackRateLimitWindow)
+		return nil
+	}
 
 	// Get the preset to determine the software encoder for this codec
 	preset := ffmpeg.GetPreset(originalJob.PresetID)
@@ -228,6 +256,9 @@ func (q *Queue) AddSoftwareFallback(originalJob *Job, fallbackReason string) *Jo
 
 	q.jobs[job.ID] = job
 	q.order = append(q.order, job.ID)
+
+	// Record this fallback for rate limiting
+	q.fallbackTimes = append(q.fallbackTimes, now)
 
 	if err := q.save(); err != nil {
 		fmt.Printf("Warning: failed to persist queue: %v\n", err)

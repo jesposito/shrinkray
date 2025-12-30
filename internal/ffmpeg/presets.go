@@ -206,9 +206,8 @@ func BuildPresetArgs(preset *Preset, sourceBitrate int64) (inputArgs []string, o
 		"-c:s", "copy",
 	)
 
-	// Increase muxing queue size to prevent "Too many packets buffered" errors.
-	// Default is 8192 packets which is insufficient for some inputs with unusual
-	// timing or long keyframe intervals. 4096 is a safe middle ground.
+	// Increase muxing queue size to reduce "Too many packets buffered" failures
+	// on inputs with unusual timing or interleaving.
 	outputArgs = append(outputArgs, "-max_muxing_queue_size", "4096")
 
 	return inputArgs, outputArgs

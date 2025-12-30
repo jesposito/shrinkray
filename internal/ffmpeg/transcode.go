@@ -54,38 +54,62 @@ func (e *TranscodeError) Error() string {
 func (e *TranscodeError) IsHardwareEncoderFailure() bool {
 	stderr := strings.ToLower(e.Stderr)
 
-	// Hardware encoder initialization/execution patterns
-	hwPatterns := []string{
-		// NVENC
-		"nvenc", "nvcuda", "cuda", "nvidia",
+	// Strong patterns: definitively indicate HW encoder failure (match immediately)
+	strongPatterns := []string{
+		// NVENC specific failures
 		"openencodesessionex failed",
+		"cannot load nvcuda",
 		"cannot load cuda",
+		"failed to open nvenc",
 		"no capable devices found",
-		// VAAPI
-		"vaapi", "va-api",
+		// VAAPI specific failures
 		"failed to initialise vaapi",
-		"cannot open display",
-		"drm render node",
-		// QSV (Intel Quick Sync)
-		"qsv", "quick sync",
-		"mfxsession",
-		"no devices found",
-		// VideoToolbox
-		"videotoolbox",
-		"vt_encode",
-		// Generic hardware
-		"hardware encoder",
-		"hardware acceleration",
-		"hw accel",
-		"hwaccel",
-		"device initialization",
+		"vainitialize failed",
+		"cannot open drm render node",
+		// QSV specific failures
+		"mfxsession could not be created",
+		"error initializing qsv",
+		// VideoToolbox specific failures
+		"vt compression session",
+		"videotoolbox encode failed",
+		"error in vt_encode",
+		// Generic HW encoder failures
 		"encoder initialization failed",
+		"hardware encoder init failed",
+		"device setup failed",
 		"no encode device",
 	}
 
-	for _, pattern := range hwPatterns {
+	for _, pattern := range strongPatterns {
 		if strings.Contains(stderr, pattern) {
 			return true
+		}
+	}
+
+	// Weak patterns: vendor/technology keywords that only indicate HW failure
+	// when combined with failure indicators
+	weakPatterns := []string{
+		"nvenc", "cuda", "nvidia",
+		"vaapi", "va-api",
+		"qsv", "quick sync",
+		"videotoolbox",
+		"hwaccel", "hw accel",
+		"hardware encoder", "hardware acceleration",
+	}
+
+	failureIndicators := []string{
+		"failed", "error", "cannot", "unable", "no device", "not found",
+		"could not", "initialization", "unavailable",
+	}
+
+	// Check if any weak pattern appears alongside a failure indicator
+	for _, weak := range weakPatterns {
+		if strings.Contains(stderr, weak) {
+			for _, fail := range failureIndicators {
+				if strings.Contains(stderr, fail) {
+					return true
+				}
+			}
 		}
 	}
 

@@ -280,7 +280,7 @@ func TestTranscodeErrorIsHardwareEncoderFailure(t *testing.T) {
 		// Should match: NVENC errors
 		{"nvenc init", "Error: Failed to initialize NVENC", true},
 		{"cuda load", "Cannot load cuda.dll", true},
-		{"nvidia device", "No NVIDIA devices found", true},
+		{"nvidia device", "Error: No NVIDIA devices found", true},
 		{"nvenc session", "OpenEncodeSessionEx failed", true},
 
 		// Should match: VAAPI errors
