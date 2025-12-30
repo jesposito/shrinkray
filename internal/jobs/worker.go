@@ -314,7 +314,17 @@ func (w *Worker) processJob(job *Job) {
 
 		// Clean up temp file on failure
 		os.Remove(tempPath)
-		w.queue.FailJob(job.ID, err.Error())
+
+		// Check if we have detailed error info from the transcoder
+		if te, ok := err.(*ffmpeg.TranscodeError); ok {
+			w.queue.FailJobWithDetails(job.ID, te.Message, &FailJobDetails{
+				Stderr:     te.Stderr,
+				ExitCode:   te.ExitCode,
+				FFmpegArgs: te.Args,
+			})
+		} else {
+			w.queue.FailJob(job.ID, err.Error())
+		}
 		return
 	}
 

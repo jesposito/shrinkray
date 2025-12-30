@@ -35,6 +35,81 @@ type TranscodeResult struct {
 	Duration    time.Duration `json:"duration"` // How long the transcode took
 }
 
+// TranscodeError contains detailed error information from a failed transcode
+type TranscodeError struct {
+	Message   string   // The error message
+	Stderr    string   // Bounded stderr output (last ~64KB)
+	ExitCode  int      // FFmpeg exit code
+	Args      []string // FFmpeg command arguments
+}
+
+func (e *TranscodeError) Error() string {
+	return e.Message
+}
+
+// maxStderrSize is the maximum amount of stderr to capture (64KB)
+const maxStderrSize = 64 * 1024
+
+// boundedBuffer is a ring buffer that keeps only the last N bytes
+type boundedBuffer struct {
+	buf   []byte
+	size  int
+	start int
+}
+
+func newBoundedBuffer(size int) *boundedBuffer {
+	return &boundedBuffer{
+		buf:  make([]byte, size),
+		size: 0,
+	}
+}
+
+func (b *boundedBuffer) Write(p []byte) (n int, err error) {
+	n = len(p)
+	if n >= len(b.buf) {
+		// If input is larger than buffer, just keep the end
+		copy(b.buf, p[n-len(b.buf):])
+		b.size = len(b.buf)
+		b.start = 0
+	} else if b.size < len(b.buf) {
+		// Buffer not yet full
+		space := len(b.buf) - b.size
+		if n <= space {
+			copy(b.buf[b.size:], p)
+			b.size += n
+		} else {
+			// Fill remaining space, then wrap
+			copy(b.buf[b.size:], p[:space])
+			copy(b.buf, p[space:])
+			b.size = len(b.buf)
+			b.start = n - space
+		}
+	} else {
+		// Buffer is full, overwrite from start
+		end := b.start + n
+		if end <= len(b.buf) {
+			copy(b.buf[b.start:], p)
+		} else {
+			firstPart := len(b.buf) - b.start
+			copy(b.buf[b.start:], p[:firstPart])
+			copy(b.buf, p[firstPart:])
+		}
+		b.start = end % len(b.buf)
+	}
+	return n, nil
+}
+
+func (b *boundedBuffer) String() string {
+	if b.size < len(b.buf) {
+		return string(b.buf[:b.size])
+	}
+	// Reorder circular buffer
+	result := make([]byte, len(b.buf))
+	copy(result, b.buf[b.start:])
+	copy(result[len(b.buf)-b.start:], b.buf[:b.start])
+	return string(result)
+}
+
 // Transcoder wraps ffmpeg transcoding functionality
 type Transcoder struct {
 	ffmpegPath string
@@ -90,6 +165,10 @@ func (t *Transcoder) Transcode(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
 	}
+
+	// Capture stderr for error diagnostics (bounded to prevent memory issues)
+	stderrBuf := newBoundedBuffer(maxStderrSize)
+	cmd.Stderr = stderrBuf
 
 	// Start the command
 	if err := cmd.Start(); err != nil {
@@ -163,7 +242,20 @@ func (t *Transcoder) Transcode(
 	if err := cmd.Wait(); err != nil {
 		// Clean up partial output file
 		os.Remove(outputPath)
-		return nil, fmt.Errorf("ffmpeg failed: %w", err)
+
+		// Extract exit code if available
+		exitCode := 1
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			exitCode = exitErr.ExitCode()
+		}
+
+		// Return detailed error for diagnostics
+		return nil, &TranscodeError{
+			Message:  fmt.Sprintf("ffmpeg failed: %v", err),
+			Stderr:   stderrBuf.String(),
+			ExitCode: exitCode,
+			Args:     args,
+		}
 	}
 
 	// Get output file size

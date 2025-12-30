@@ -29,6 +29,9 @@ type Job struct {
 	Speed       float64   `json:"speed"`        // Encoding speed (1.0 = realtime)
 	ETA         string    `json:"eta"`          // Human-readable ETA
 	Error       string    `json:"error,omitempty"`
+	Stderr      string    `json:"stderr,omitempty"`       // Last ~64KB of ffmpeg stderr for diagnostics
+	ExitCode    int       `json:"exit_code,omitempty"`    // FFmpeg exit code (0 = success)
+	FFmpegArgs  []string  `json:"ffmpeg_args,omitempty"`  // FFmpeg command arguments used
 	InputSize   int64     `json:"input_size"`
 	OutputSize  int64     `json:"output_size,omitempty"`  // Populated after completion
 	SpaceSaved  int64     `json:"space_saved,omitempty"`  // InputSize - OutputSize

@@ -303,8 +303,20 @@ func (q *Queue) CompleteJob(id string, outputPath string, outputSize int64) erro
 	return nil
 }
 
+// FailJobDetails contains optional diagnostic information for failed jobs
+type FailJobDetails struct {
+	Stderr     string   // Bounded stderr output from ffmpeg
+	ExitCode   int      // FFmpeg exit code
+	FFmpegArgs []string // FFmpeg command arguments used
+}
+
 // FailJob marks a job as failed
 func (q *Queue) FailJob(id string, errMsg string) error {
+	return q.FailJobWithDetails(id, errMsg, nil)
+}
+
+// FailJobWithDetails marks a job as failed with additional diagnostic info
+func (q *Queue) FailJobWithDetails(id string, errMsg string, details *FailJobDetails) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -317,6 +329,13 @@ func (q *Queue) FailJob(id string, errMsg string) error {
 	job.Error = errMsg
 	job.CompletedAt = time.Now()
 	job.TempPath = "" // Clear temp path
+
+	// Add diagnostic details if provided
+	if details != nil {
+		job.Stderr = details.Stderr
+		job.ExitCode = details.ExitCode
+		job.FFmpegArgs = details.FFmpegArgs
+	}
 
 	if err := q.save(); err != nil {
 		fmt.Printf("Warning: failed to persist queue: %v\n", err)

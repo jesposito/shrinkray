@@ -809,6 +809,199 @@
             margin-top: 8px;
         }
 
+        /* Error Helper Panel */
+        .error-helper-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            font-family: var(--font-sans);
+            cursor: pointer;
+            padding: 4px 0;
+            margin-top: 8px;
+            transition: color var(--transition-fast);
+        }
+
+        .error-helper-toggle:hover {
+            color: var(--text-primary);
+        }
+
+        .error-helper-toggle svg {
+            width: 12px;
+            height: 12px;
+            transition: transform var(--transition-fast);
+        }
+
+        .error-helper-toggle.expanded svg {
+            transform: rotate(180deg);
+        }
+
+        .error-helper-panel {
+            display: none;
+            margin-top: 12px;
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+            font-size: 0.8125rem;
+        }
+
+        .error-helper-panel.expanded {
+            display: block;
+        }
+
+        .error-helper-summary {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .error-helper-summary-text {
+            flex: 1;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .error-helper-confidence {
+            display: inline-flex;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            flex-shrink: 0;
+        }
+
+        .error-helper-confidence.high {
+            background: var(--success-light);
+            color: var(--success);
+        }
+
+        .error-helper-confidence.medium {
+            background: var(--warning-light);
+            color: var(--warning);
+        }
+
+        .error-helper-confidence.low {
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+
+        .error-helper-section {
+            margin-bottom: 12px;
+        }
+
+        .error-helper-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .error-helper-section-title {
+            font-size: 0.6875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-tertiary);
+            margin-bottom: 6px;
+        }
+
+        .error-helper-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .error-helper-list li {
+            position: relative;
+            padding-left: 16px;
+            margin-bottom: 4px;
+            color: var(--text-secondary);
+        }
+
+        .error-helper-list li:last-child {
+            margin-bottom: 0;
+        }
+
+        .error-helper-list li::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 8px;
+            width: 6px;
+            height: 6px;
+            background: var(--text-tertiary);
+            border-radius: 50%;
+        }
+
+        .error-helper-matched {
+            background: var(--warning-light);
+            padding: 8px 10px;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--warning);
+            word-break: break-word;
+            overflow-wrap: anywhere;
+        }
+
+        .error-helper-raw-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: none;
+            border: none;
+            color: var(--text-tertiary);
+            font-size: 0.75rem;
+            font-family: var(--font-sans);
+            cursor: pointer;
+            padding: 4px 0;
+            transition: color var(--transition-fast);
+        }
+
+        .error-helper-raw-toggle:hover {
+            color: var(--text-secondary);
+        }
+
+        .error-helper-raw-toggle svg {
+            width: 10px;
+            height: 10px;
+            transition: transform var(--transition-fast);
+        }
+
+        .error-helper-raw-toggle.expanded svg {
+            transform: rotate(180deg);
+        }
+
+        .error-helper-raw {
+            display: none;
+            margin-top: 8px;
+            padding: 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 0.6875rem;
+            line-height: 1.6;
+            color: var(--text-secondary);
+            max-height: 200px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .error-helper-raw.expanded {
+            display: block;
+        }
+
+        .error-helper-no-match {
+            color: var(--text-tertiary);
+            font-style: italic;
+        }
+
         .job-actions {
             margin-top: 12px;
         }
@@ -1514,6 +1707,324 @@
             return String(str).replace(/["\\]/g, '\\$&');
         }
 
+        // Error Helper: Pattern taxonomy for common ffmpeg errors
+        // Each pattern has: pattern (string or regex), summary, confidence, causes, steps
+        const ERROR_PATTERNS = [
+            {
+                id: 'no_such_file',
+                pattern: /No such file or directory/i,
+                summary: 'FFmpeg could not find the input file.',
+                confidence: 'high',
+                causes: [
+                    'The file was moved, renamed, or deleted before transcoding started.',
+                    'The file path contains special characters that weren\'t properly handled.',
+                ],
+                steps: [
+                    'Verify the file still exists at the expected location.',
+                    'Check if the file was moved by another process.',
+                    'Try adding the file again from the file browser.',
+                ],
+            },
+            {
+                id: 'moov_atom',
+                pattern: /moov atom not found/i,
+                summary: 'The MP4 file is missing its moov atom (metadata header).',
+                confidence: 'high',
+                causes: [
+                    'The file is an incomplete download or interrupted recording.',
+                    'The file was truncated or corrupted during transfer.',
+                ],
+                steps: [
+                    'Re-download or re-copy the source file.',
+                    'If this is from a camera/phone, try exporting again from the original device.',
+                    'Use a recovery tool like untrunc or ffmpeg\'s -movflags faststart to attempt repair.',
+                ],
+            },
+            {
+                id: 'invalid_data',
+                pattern: /Invalid data found when processing input/i,
+                summary: 'FFmpeg found corrupted or unrecognized data in the input.',
+                confidence: 'high',
+                causes: [
+                    'The file is corrupted or has an unsupported container format.',
+                    'The file header doesn\'t match the actual content.',
+                ],
+                steps: [
+                    'Try re-downloading or re-copying the file.',
+                    'Check if the file plays correctly in VLC or another player.',
+                    'Try remuxing the file with ffmpeg: ffmpeg -i input -c copy output.mkv',
+                ],
+            },
+            {
+                id: 'codec_params',
+                pattern: /Could not find codec parameters/i,
+                summary: 'FFmpeg couldn\'t determine how to decode this file.',
+                confidence: 'high',
+                causes: [
+                    'The file uses an unknown or unsupported codec.',
+                    'The file\'s stream information is missing or corrupted.',
+                ],
+                steps: [
+                    'Check file info with: ffprobe -v error -show_streams filename',
+                    'Try converting with a different preset.',
+                    'Ensure ffmpeg has the required codec libraries installed.',
+                ],
+            },
+            {
+                id: 'unknown_decoder',
+                pattern: /Unknown decoder|Decoder .* not found|Unsupported codec/i,
+                summary: 'FFmpeg doesn\'t have the decoder for this file\'s codec.',
+                confidence: 'high',
+                causes: [
+                    'The file uses a proprietary or uncommon codec.',
+                    'FFmpeg was compiled without support for this codec.',
+                ],
+                steps: [
+                    'Check what codec the file uses: ffprobe -v error -select_streams v:0 -show_entries stream=codec_name filename',
+                    'Install a version of ffmpeg with broader codec support.',
+                    'Convert the file using different software first.',
+                ],
+            },
+            {
+                id: 'decode_error',
+                pattern: /Error while decoding stream|decode_slice_header error|Invalid NAL unit/i,
+                summary: 'FFmpeg encountered errors while decoding the video stream.',
+                confidence: 'medium',
+                causes: [
+                    'The video stream contains corrupted frames.',
+                    'The file was partially damaged during download or transfer.',
+                ],
+                steps: [
+                    'Try re-downloading or re-copying the source file.',
+                    'Check if the file plays with visual glitches in a video player.',
+                    'Try adding -err_detect ignore_err to ignore minor errors.',
+                ],
+            },
+            {
+                id: 'too_many_packets',
+                pattern: /Too many packets buffered for output stream/i,
+                summary: 'FFmpeg ran out of buffer space for output packets.',
+                confidence: 'medium',
+                causes: [
+                    'The input has unusual timing or very long keyframe intervals.',
+                    'There\'s a mismatch between audio and video stream timing.',
+                ],
+                steps: [
+                    'Try adding -max_muxing_queue_size 1024 or higher.',
+                    'Check if the source file has sync issues.',
+                    'Try processing video and audio separately.',
+                ],
+            },
+            {
+                id: 'permission_denied',
+                pattern: /Permission denied/i,
+                summary: 'FFmpeg doesn\'t have permission to access a file or directory.',
+                confidence: 'high',
+                causes: [
+                    'The input file or output directory has restrictive permissions.',
+                    'The file is locked by another process.',
+                ],
+                steps: [
+                    'Check file and folder permissions.',
+                    'Ensure no other application has the file open.',
+                    'Try running the application with appropriate permissions.',
+                ],
+            },
+            {
+                id: 'hwaccel_init',
+                pattern: /Failed to initialise NVENC|Cannot load nvcuda|CUDA|VAAPI|videotoolbox.*failed|hwaccel.*failed/i,
+                summary: 'Hardware acceleration initialization failed.',
+                confidence: 'high',
+                causes: [
+                    'GPU drivers are outdated or not properly installed.',
+                    'The GPU doesn\'t support the required encoding features.',
+                    'Another process is using the hardware encoder.',
+                ],
+                steps: [
+                    'Update your GPU drivers.',
+                    'Try using a software encoder preset instead.',
+                    'Check if other GPU-accelerated applications are running.',
+                ],
+            },
+            {
+                id: 'out_of_memory',
+                pattern: /Cannot allocate memory|Out of memory|memory allocation failed/i,
+                summary: 'The system ran out of memory during transcoding.',
+                confidence: 'high',
+                causes: [
+                    'The video resolution or bitrate is too high for available RAM.',
+                    'Too many concurrent transcoding jobs.',
+                ],
+                steps: [
+                    'Close other memory-intensive applications.',
+                    'Reduce the number of concurrent workers.',
+                    'Try a lower resolution or bitrate preset.',
+                ],
+            },
+            {
+                id: 'disk_full',
+                pattern: /No space left on device|disk full/i,
+                summary: 'The disk ran out of space.',
+                confidence: 'high',
+                causes: [
+                    'The output drive doesn\'t have enough free space.',
+                    'The temp directory is on a full partition.',
+                ],
+                steps: [
+                    'Free up disk space on the output drive.',
+                    'Check available space in the temp directory.',
+                    'Consider outputting to a different drive.',
+                ],
+            },
+            {
+                id: 'dts_error',
+                pattern: /non-monotonous DTS|DTS.*out of order/i,
+                summary: 'The video has timing/timestamp issues.',
+                confidence: 'medium',
+                causes: [
+                    'The source video has corrupted or incorrect timestamps.',
+                    'The file was improperly edited or concatenated.',
+                ],
+                steps: [
+                    'This is often just a warning. If the output looks fine, ignore it.',
+                    'Try remuxing first: ffmpeg -i input -c copy -fflags +genpts output.mkv',
+                    'Re-encode from the original source if available.',
+                ],
+            },
+        ];
+
+        // Analyze error and return structured diagnosis
+        function analyzeError(job) {
+            const stderr = job.stderr || '';
+            const error = job.error || '';
+            const combined = stderr + '\n' + error;
+
+            // Try to match patterns
+            for (const pattern of ERROR_PATTERNS) {
+                const regex = pattern.pattern instanceof RegExp
+                    ? pattern.pattern
+                    : new RegExp(pattern.pattern, 'i');
+
+                const match = combined.match(regex);
+                if (match) {
+                    return {
+                        summary: pattern.summary,
+                        confidence: pattern.confidence,
+                        matched: match[0],
+                        causes: pattern.causes,
+                        steps: pattern.steps,
+                        hasStderr: !!stderr,
+                        stderr: stderr,
+                    };
+                }
+            }
+
+            // No pattern matched - return fallback
+            return {
+                summary: 'Could not confidently identify this error.',
+                confidence: 'low',
+                matched: null,
+                causes: ['The error doesn\'t match any known patterns.'],
+                steps: ['Review the raw ffmpeg output below for more details.'],
+                hasStderr: !!stderr,
+                stderr: stderr,
+            };
+        }
+
+        // Render error helper HTML (all strings are escaped)
+        function renderErrorHelper(job) {
+            // Only render for failed jobs with stderr
+            if (job.status !== 'failed') return '';
+
+            const analysis = analyzeError(job);
+            const safeId = escapeHtml(job.id);
+            const safeSummary = escapeHtml(analysis.summary);
+            const safeMatched = analysis.matched ? escapeHtml(analysis.matched) : null;
+            const safeStderr = escapeHtml(analysis.stderr);
+
+            const causesHtml = analysis.causes
+                .map(c => `<li>${escapeHtml(c)}</li>`)
+                .join('');
+
+            const stepsHtml = analysis.steps
+                .map(s => `<li>${escapeHtml(s)}</li>`)
+                .join('');
+
+            const confidenceClass = analysis.confidence;
+
+            return `
+                <button class="error-helper-toggle" onclick="toggleErrorHelper('${safeId}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                    Explain error
+                </button>
+                <div class="error-helper-panel" id="error-helper-${safeId}">
+                    <div class="error-helper-summary">
+                        <span class="error-helper-summary-text">${safeSummary}</span>
+                        <span class="error-helper-confidence ${confidenceClass}">${analysis.confidence}</span>
+                    </div>
+
+                    ${safeMatched ? `
+                        <div class="error-helper-section">
+                            <div class="error-helper-section-title">Matched Pattern</div>
+                            <div class="error-helper-matched">${safeMatched}</div>
+                        </div>
+                    ` : `
+                        <div class="error-helper-section">
+                            <div class="error-helper-no-match">No specific pattern matched.</div>
+                        </div>
+                    `}
+
+                    <div class="error-helper-section">
+                        <div class="error-helper-section-title">Likely Causes</div>
+                        <ul class="error-helper-list">${causesHtml}</ul>
+                    </div>
+
+                    <div class="error-helper-section">
+                        <div class="error-helper-section-title">What To Try</div>
+                        <ul class="error-helper-list">${stepsHtml}</ul>
+                    </div>
+
+                    <div class="error-helper-section">
+                        <button class="error-helper-raw-toggle" onclick="toggleRawOutput('${safeId}')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                            Show raw ffmpeg output
+                        </button>
+                        <div class="error-helper-raw" id="error-raw-${safeId}">${safeStderr || 'No stderr output captured.'}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Toggle error helper panel
+        function toggleErrorHelper(jobId) {
+            const safeSelector = `#error-helper-${escapeCssSelector(jobId)}`;
+            const panel = document.querySelector(safeSelector);
+            const toggleSelector = `.job-item[data-job-id="${escapeCssSelector(jobId)}"] .error-helper-toggle`;
+            const toggle = document.querySelector(toggleSelector);
+
+            if (panel && toggle) {
+                panel.classList.toggle('expanded');
+                toggle.classList.toggle('expanded');
+            }
+        }
+
+        // Toggle raw output panel
+        function toggleRawOutput(jobId) {
+            const safeSelector = `#error-raw-${escapeCssSelector(jobId)}`;
+            const raw = document.querySelector(safeSelector);
+            const toggleSelector = `#error-helper-${escapeCssSelector(jobId)} .error-helper-raw-toggle`;
+            const toggle = document.querySelector(toggleSelector);
+
+            if (raw && toggle) {
+                raw.classList.toggle('expanded');
+                toggle.classList.toggle('expanded');
+            }
+        }
+
         function formatBytes(bytes) {
             if (bytes === 0) return '0 B';
             if (bytes < 0) return '0 B';
@@ -1889,6 +2400,7 @@
                         ` : ''}
                         <div class="job-details">${detailsHtml}</div>
                         ${job.status === 'failed' ? `<div class="job-error">${safeError}</div>` : ''}
+                        ${job.status === 'failed' ? renderErrorHelper(job) : ''}
                         ${job.status === 'pending' || job.status === 'running' ? `
                             <div class="job-actions">
                                 <button class="btn btn-secondary btn-sm" onclick="cancelJob('${safeId}')">Cancel</button>
