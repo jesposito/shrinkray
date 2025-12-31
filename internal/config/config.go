@@ -73,7 +73,16 @@ type Config struct {
 	// PushoverAppToken is the Pushover application token for notifications
 	PushoverAppToken string `yaml:"pushover_app_token"`
 
-	// NotifyOnComplete triggers a Pushover notification when all jobs finish
+	// NtfyServer is the ntfy server URL for notifications
+	NtfyServer string `yaml:"ntfy_server"`
+
+	// NtfyTopic is the ntfy topic for notifications
+	NtfyTopic string `yaml:"ntfy_topic"`
+
+	// NtfyToken is the ntfy access token (optional)
+	NtfyToken string `yaml:"ntfy_token"`
+
+	// NotifyOnComplete triggers a notification when all jobs finish
 	NotifyOnComplete bool `yaml:"notify_on_complete"`
 
 	// Features contains feature flags for phased rollout of new functionality
@@ -90,6 +99,7 @@ func DefaultConfig() *Config {
 		FFmpegPath:       "ffmpeg",
 		FFprobePath:      "ffprobe",
 		QueueFile:        "",
+		NtfyServer:       "https://ntfy.sh",
 		Features:         DefaultFeatureFlags(),
 	}
 }

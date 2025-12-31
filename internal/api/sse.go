@@ -68,8 +68,8 @@ func (h *Handler) checkAndSendNotification(w http.ResponseWriter, flusher http.F
 	h.notifyMu.Lock()
 	defer h.notifyMu.Unlock()
 
-	// Check if notification is enabled and Pushover is configured
-	if !h.cfg.NotifyOnComplete || !h.pushover.IsConfigured() {
+	// Check if notification is enabled and at least one provider is configured
+	if !h.cfg.NotifyOnComplete || (!h.pushover.IsConfigured() && !h.ntfy.IsConfigured()) {
 		return
 	}
 
@@ -83,9 +83,23 @@ func (h *Handler) checkAndSendNotification(w http.ResponseWriter, flusher http.F
 	message := fmt.Sprintf("%d jobs complete, %d failed\nSaved %s",
 		stats.Complete, stats.Failed, formatBytes(stats.TotalSaved))
 
-	if err := h.pushover.Send("Shrinkray Complete", message); err != nil {
-		// Log error but don't crash - leave checkbox checked for retry
-		fmt.Printf("Failed to send Pushover notification: %v\n", err)
+	allSent := true
+	if h.pushover.IsConfigured() {
+		if err := h.pushover.Send("Shrinkray Complete", message); err != nil {
+			// Log error but don't crash - leave checkbox checked for retry
+			fmt.Printf("Failed to send Pushover notification: %v\n", err)
+			allSent = false
+		}
+	}
+	if h.ntfy.IsConfigured() {
+		if err := h.ntfy.Send("Shrinkray Complete", message); err != nil {
+			// Log error but don't crash - leave checkbox checked for retry
+			fmt.Printf("Failed to send ntfy notification: %v\n", err)
+			allSent = false
+		}
+	}
+
+	if !allSent {
 		return
 	}
 

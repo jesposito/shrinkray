@@ -259,6 +259,44 @@
             gap: 8px;
         }
 
+        .panel-toggle {
+            background: none;
+            border: 0;
+            padding: 0;
+            color: inherit;
+            cursor: pointer;
+            width: 100%;
+            font: inherit;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .panel-toggle:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+            border-radius: 6px;
+        }
+
+        .panel-collapse-toggle {
+            transition: transform var(--transition-fast);
+        }
+
+        .panel-toggle-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .panel.collapsed .panel-collapse-toggle {
+            transform: rotate(-90deg);
+        }
+
+        .panel.collapsed .panel-body {
+            display: none;
+        }
+
         .breadcrumb {
             display: flex;
             align-items: center;
@@ -571,8 +609,23 @@
             max-height: 100%;
         }
 
+        .panel-body {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .queue-panel-content {
+            flex: 1;
+            min-height: 0;
+        }
+
         .queue-list {
             overflow-y: auto;
+        }
+
+        .queue-panel-content .queue-list {
+            flex: 1;
         }
 
         /* Active Jobs Panel - Separate box above queue */
@@ -1557,14 +1610,19 @@
             <div class="queue-panel">
                 <div class="panel active-jobs-panel" id="active-panel" style="display: none;">
                     <div class="panel-header">
-                        <span class="panel-title">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polygon points="5 3 19 12 5 21 5 3"/>
+                        <button class="panel-toggle" type="button" onclick="togglePanel('active-panel')" aria-expanded="true" aria-controls="active-panel-content">
+                            <span class="panel-title">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polygon points="5 3 19 12 5 21 5 3"/>
+                                </svg>
+                                Active
+                            </span>
+                            <svg class="panel-collapse-toggle" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
                             </svg>
-                            Active
-                        </span>
+                        </button>
                     </div>
-                    <div class="active-panel-content">
+                    <div class="panel-body active-panel-content" id="active-panel-content">
                         <div class="active-panel-section" id="now-processing-section">
                             <div class="active-panel-title">Now Processing</div>
                             <div id="now-processing-content"></div>
@@ -1575,52 +1633,61 @@
                         </div>
                     </div>
                 </div>
-                <div class="panel queue-panel-inner">
+                <div class="panel queue-panel-inner" id="queue-panel">
                     <div class="panel-header">
-                        <span class="panel-title">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="8" y1="6" x2="21" y2="6"/>
-                                <line x1="8" y1="12" x2="21" y2="12"/>
-                                <line x1="8" y1="18" x2="21" y2="18"/>
-                                <line x1="3" y1="6" x2="3.01" y2="6"/>
-                                <line x1="3" y1="12" x2="3.01" y2="12"/>
-                                <line x1="3" y1="18" x2="3.01" y2="18"/>
-                            </svg>
-                            Queue
-                        </span>
-                        <label class="notify-label" id="notify-container" style="display: none">
-                            <input type="checkbox" id="notify-checkbox" onchange="updateNotifySetting(this.checked)">
-                            <span>Notify when done</span>
-                        </label>
+                        <button class="panel-toggle" type="button" onclick="togglePanel('queue-panel')" aria-expanded="true" aria-controls="queue-panel-content">
+                            <span class="panel-title">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="8" y1="6" x2="21" y2="6"/>
+                                    <line x1="8" y1="12" x2="21" y2="12"/>
+                                    <line x1="8" y1="18" x2="21" y2="18"/>
+                                    <line x1="3" y1="6" x2="3.01" y2="6"/>
+                                    <line x1="3" y1="12" x2="3.01" y2="12"/>
+                                    <line x1="3" y1="18" x2="3.01" y2="18"/>
+                                </svg>
+                                Queue
+                            </span>
+                            <span class="panel-toggle-actions">
+                                <label class="notify-label" id="notify-container" style="display: none" onclick="event.stopPropagation()">
+                                    <input type="checkbox" id="notify-checkbox" onchange="updateNotifySetting(this.checked)" onclick="event.stopPropagation()">
+                                    <span>Notify when done</span>
+                                </label>
+                                <svg class="panel-collapse-toggle" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </span>
+                        </button>
                     </div>
-                    <div class="queue-list" id="queue-list">
-                        <div class="queue-empty">
-                            <div class="queue-empty-icon">
-                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.3">
-                                    <rect x="3" y="3" width="18" height="18" rx="2"/>
-                                    <path d="M3 9h18"/>
-                                    <path d="M9 21V9"/>
+                    <div class="panel-body queue-panel-content" id="queue-panel-content">
+                        <div class="queue-list" id="queue-list">
+                            <div class="queue-empty">
+                                <div class="queue-empty-icon">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.3">
+                                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                        <path d="M3 9h18"/>
+                                        <path d="M9 21V9"/>
+                                    </svg>
+                                </div>
+                                <div>No jobs in queue</div>
+                                <div style="font-size: 0.8125rem; margin-top: 4px; color: var(--text-tertiary)">Select files and start transcoding</div>
+                            </div>
+                        </div>
+                        <!-- Completed Jobs Section -->
+                        <div class="completed-section" id="completed-section" style="display: none;">
+                            <div class="completed-header" onclick="toggleCompletedSection()">
+                                <div class="completed-title">
+                                    <span>Recently Completed</span>
+                                    <span class="completed-count" id="completed-count">0</span>
+                                </div>
+                                <svg class="completed-toggle" id="completed-toggle" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
                                 </svg>
                             </div>
-                            <div>No jobs in queue</div>
-                            <div style="font-size: 0.8125rem; margin-top: 4px; color: var(--text-tertiary)">Select files and start transcoding</div>
+                            <div class="completed-list" id="completed-list"></div>
                         </div>
-                    </div>
-                    <!-- Completed Jobs Section -->
-                    <div class="completed-section" id="completed-section" style="display: none;">
-                        <div class="completed-header" onclick="toggleCompletedSection()">
-                            <div class="completed-title">
-                                <span>Recently Completed</span>
-                                <span class="completed-count" id="completed-count">0</span>
-                            </div>
-                            <svg class="completed-toggle" id="completed-toggle" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="6 9 12 15 18 9"></polyline>
-                            </svg>
+                        <div class="queue-footer">
+                            <button class="btn btn-secondary btn-sm" onclick="clearQueue()" style="flex: 1">Clear Queue</button>
                         </div>
-                        <div class="completed-list" id="completed-list"></div>
-                    </div>
-                    <div class="queue-footer">
-                        <button class="btn btn-secondary btn-sm" onclick="clearQueue()" style="flex: 1">Clear Queue</button>
                     </div>
                 </div>
             </div>
@@ -1700,6 +1767,45 @@
                         </div>
                         <div class="setting-control">
                             <button class="btn btn-secondary btn-sm" id="test-pushover-btn" onclick="testPushover()">Test</button>
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <div class="setting-name">ntfy Server</div>
+                            <div class="setting-desc">Server URL (default: https://ntfy.sh)</div>
+                        </div>
+                        <div class="setting-control">
+                            <input type="text" class="setting-input" id="setting-ntfy-server"
+                                   placeholder="https://ntfy.sh" onchange="updateSetting('ntfy_server', this.value)">
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <div class="setting-name">ntfy Topic</div>
+                            <div class="setting-desc">Topic name for notifications</div>
+                        </div>
+                        <div class="setting-control">
+                            <input type="text" class="setting-input" id="setting-ntfy-topic"
+                                   placeholder="Enter topic" onchange="updateSetting('ntfy_topic', this.value)">
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <div class="setting-name">ntfy Token</div>
+                            <div class="setting-desc">Optional access token</div>
+                        </div>
+                        <div class="setting-control">
+                            <input type="text" class="setting-input" id="setting-ntfy-token"
+                                   placeholder="Enter token (optional)" onchange="updateSetting('ntfy_token', this.value)">
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <div class="setting-name">Test ntfy</div>
+                            <div class="setting-desc">Send a test to verify setup</div>
+                        </div>
+                        <div class="setting-control">
+                            <button class="btn btn-secondary btn-sm" id="test-ntfy-btn" onclick="testNtfy()">Test</button>
                         </div>
                     </div>
                 </div>
@@ -1829,6 +1935,10 @@
         // Virtual scroll state
         let visibleRange = { start: 0, end: 20 };
         let scrollContainer = null;
+
+        // Error helper UI state (preserve expand/collapse across rerenders)
+        const errorHelperExpanded = new Set();
+        const errorRawExpanded = new Set();
 
         // ========================================
         // Virtual Scroll Implementation
@@ -1963,6 +2073,20 @@
             jobOrder = [];
             Object.values(statusIndex).forEach(set => set.clear());
             visibleRange = { start: 0, end: 20 };
+        }
+
+        function pruneErrorHelperState(jobs) {
+            const activeIds = new Set(jobs.map(job => job.id));
+            for (const id of errorHelperExpanded) {
+                if (!activeIds.has(id)) {
+                    errorHelperExpanded.delete(id);
+                }
+            }
+            for (const id of errorRawExpanded) {
+                if (!activeIds.has(id)) {
+                    errorRawExpanded.delete(id);
+                }
+            }
         }
 
         // Escape HTML to prevent XSS
@@ -2272,6 +2396,8 @@
             if (job.status !== 'failed') return '';
 
             const analysis = analyzeError(job);
+            const isExpanded = errorHelperExpanded.has(job.id);
+            const isRawExpanded = errorRawExpanded.has(job.id);
             const safeId = escapeHtml(job.id);
             const safeSummary = escapeHtml(analysis.summary);
             const safeMatched = analysis.matched ? escapeHtml(analysis.matched) : null;
@@ -2288,13 +2414,13 @@
             const confidenceClass = analysis.confidence;
 
             return `
-                <button class="error-helper-toggle" onclick="toggleErrorHelper('${safeId}')">
+                <button class="error-helper-toggle ${isExpanded ? 'expanded' : ''}" onclick="toggleErrorHelper('${safeId}')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg>
                     Explain error
                 </button>
-                <div class="error-helper-panel" id="error-helper-${safeId}">
+                <div class="error-helper-panel ${isExpanded ? 'expanded' : ''}" id="error-helper-${safeId}">
                     <div class="error-helper-summary">
                         <span class="error-helper-summary-text">${safeSummary}</span>
                         <span class="error-helper-confidence ${confidenceClass}">${analysis.confidence}</span>
@@ -2322,13 +2448,13 @@
                     </div>
 
                     <div class="error-helper-section">
-                        <button class="error-helper-raw-toggle" onclick="toggleRawOutput('${safeId}')">
+                        <button class="error-helper-raw-toggle ${isRawExpanded ? 'expanded' : ''}" onclick="toggleRawOutput('${safeId}')">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="6 9 12 15 18 9"></polyline>
                             </svg>
                             Show raw ffmpeg output
                         </button>
-                        <div class="error-helper-raw" id="error-raw-${safeId}">${safeStderr || 'No stderr output captured.'}</div>
+                        <div class="error-helper-raw ${isRawExpanded ? 'expanded' : ''}" id="error-raw-${safeId}">${safeStderr || 'No stderr output captured.'}</div>
                     </div>
                 </div>
             `;
@@ -2342,8 +2468,13 @@
             const toggle = document.querySelector(toggleSelector);
 
             if (panel && toggle) {
-                panel.classList.toggle('expanded');
-                toggle.classList.toggle('expanded');
+                const isExpanded = panel.classList.toggle('expanded');
+                toggle.classList.toggle('expanded', isExpanded);
+                if (isExpanded) {
+                    errorHelperExpanded.add(jobId);
+                } else {
+                    errorHelperExpanded.delete(jobId);
+                }
             }
         }
 
@@ -2355,8 +2486,13 @@
             const toggle = document.querySelector(toggleSelector);
 
             if (raw && toggle) {
-                raw.classList.toggle('expanded');
-                toggle.classList.toggle('expanded');
+                const isExpanded = raw.classList.toggle('expanded');
+                toggle.classList.toggle('expanded', isExpanded);
+                if (isExpanded) {
+                    errorRawExpanded.add(jobId);
+                } else {
+                    errorRawExpanded.delete(jobId);
+                }
             }
         }
 
@@ -2838,6 +2974,11 @@
                 }
             }
 
+            if (job.status !== 'failed') {
+                errorHelperExpanded.delete(job.id);
+                errorRawExpanded.delete(job.id);
+            }
+
             // If job completed, move it to the completed section
             if (job.status === 'complete') {
                 // Remove from main queue list
@@ -2871,6 +3012,7 @@
         function updateJobs(jobs) {
             const container = document.getElementById('queue-list');
             cachedJobs = jobs || [];
+            pruneErrorHelperState(cachedJobs);
 
             // Separate completed jobs from active queue
             const completedJobs = cachedJobs.filter(j => j.status === 'complete');
@@ -2931,6 +3073,19 @@
         // ========================================
         // Completed Jobs Section
         // ========================================
+
+        function togglePanel(panelId) {
+            const panel = document.getElementById(panelId);
+            if (!panel) {
+                return;
+            }
+
+            panel.classList.toggle('collapsed');
+            const toggleButton = panel.querySelector('.panel-toggle');
+            if (toggleButton) {
+                toggleButton.setAttribute('aria-expanded', String(!panel.classList.contains('collapsed')));
+            }
+        }
 
         function toggleCompletedSection() {
             const list = document.getElementById('completed-list');
@@ -3372,10 +3527,15 @@
                 document.getElementById('setting-pushover-user').value = config.pushover_user_key || '';
                 document.getElementById('setting-pushover-token').value = config.pushover_app_token || '';
 
-                // Show/hide notify checkbox based on whether Pushover is configured
+                // ntfy settings
+                document.getElementById('setting-ntfy-server').value = config.ntfy_server || '';
+                document.getElementById('setting-ntfy-topic').value = config.ntfy_topic || '';
+                document.getElementById('setting-ntfy-token').value = config.ntfy_token || '';
+
+                // Show/hide notify checkbox based on whether any provider is configured
                 const notifyContainer = document.getElementById('notify-container');
                 const notifyCheckbox = document.getElementById('notify-checkbox');
-                if (config.pushover_configured) {
+                if (config.pushover_configured || config.ntfy_configured) {
                     notifyContainer.style.display = 'flex';
                     notifyCheckbox.checked = config.notify_on_complete || false;
                 } else {
@@ -3422,7 +3582,7 @@
                 setTimeout(() => { statusEl.textContent = ''; }, 2000);
 
                 // Reload settings to update notify checkbox visibility
-                if (key === 'pushover_user_key' || key === 'pushover_app_token') {
+                if (key === 'pushover_user_key' || key === 'pushover_app_token' || key === 'ntfy_server' || key === 'ntfy_topic' || key === 'ntfy_token') {
                     loadSettings();
                 }
             } catch (err) {
@@ -3451,6 +3611,32 @@
 
             try {
                 const resp = await fetch('/api/pushover/test', { method: 'POST' });
+                const data = await resp.json();
+
+                if (!resp.ok) {
+                    throw new Error(data.error || 'Failed to send test');
+                }
+
+                statusEl.textContent = 'Test notification sent!';
+                statusEl.className = 'settings-status';
+                setTimeout(() => { statusEl.textContent = ''; }, 3000);
+            } catch (err) {
+                statusEl.textContent = `Error: ${err.message}`;
+                statusEl.className = 'settings-status error';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Test';
+            }
+        }
+
+        async function testNtfy() {
+            const btn = document.getElementById('test-ntfy-btn');
+            const statusEl = document.getElementById('settings-status');
+            btn.disabled = true;
+            btn.textContent = 'Sending...';
+
+            try {
+                const resp = await fetch('/api/ntfy/test', { method: 'POST' });
                 const data = await resp.json();
 
                 if (!resp.ok) {
