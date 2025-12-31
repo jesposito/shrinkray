@@ -528,20 +528,29 @@
             color: var(--text-secondary);
         }
 
-        .processed-badge {
-            display: inline-flex;
+        .file-trailing {
+            display: flex;
             align-items: center;
-            padding: 2px 6px;
-            border-radius: 999px;
-            font-size: 0.6875rem;
-            font-weight: 600;
-            background: rgba(16, 185, 129, 0.15);
-            color: #059669;
+            gap: 8px;
+            flex-shrink: 0;
         }
 
-        [data-theme="dark"] .processed-badge {
+        .processed-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 0.6875rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
             background: rgba(16, 185, 129, 0.2);
-            color: #34d399;
+            color: #047857;
+        }
+
+        [data-theme="dark"] .processed-tag {
+            background: rgba(16, 185, 129, 0.25);
+            color: #6ee7b7;
         }
 
         .file-list-empty {
@@ -2795,8 +2804,7 @@
                 if (entry.is_dir) {
                     const count = entry.file_count || 0;
                     const processed = entry.processed_count || 0;
-                    const size = formatBytes(entry.total_size || 0);
-                    metaHtml = `<span>${processed}/${count} processed</span><span>${size}</span>`;
+                    metaHtml = `<span>${processed}/${count} processed</span>`;
                 } else if (isVideo) {
                     const vi = entry.video_info;
                     const codec = vi.video_codec?.toLowerCase() || '';
@@ -2806,10 +2814,13 @@
                     } else if (codec.includes('av1')) {
                         codecClass = 'av1';
                     }
-                    const processedBadge = entry.processed ? '<span class="processed-badge">Processed</span>' : '';
-                    metaHtml = `<span class="codec-badge ${codecClass}">${vi.video_codec}</span><span>${vi.width}x${vi.height}</span>${processedBadge}`;
+                    metaHtml = `<span class="codec-badge ${codecClass}">${vi.video_codec}</span><span>${vi.width}x${vi.height}</span>`;
                 }
 
+                const count = entry.file_count || 0;
+                const processed = entry.processed_count || 0;
+                const isFullyProcessed = entry.is_dir ? count > 0 && processed === count : entry.processed;
+                const processedTag = isFullyProcessed ? '<span class="processed-tag">Processed</span>' : '';
                 const isSelected = selectedPaths.has(entry.path);
                 const dblClickHandler = entry.is_dir ? ' ondblclick="handleFolderDoubleClick(this, event)"' : '';
                 return `<li class="file-item${isSelected ? ' selected' : ''}" data-path="${entry.path}" data-is-dir="${entry.is_dir}" onclick="handleFileClick(this, event)"${dblClickHandler}>
@@ -2819,7 +2830,10 @@
                         <div class="file-name">${entry.name}</div>
                         <div class="file-meta">${metaHtml}</div>
                     </div>
-                    <div class="file-size">${formatBytes(entry.size)}</div>
+                    <div class="file-trailing">
+                        ${processedTag}
+                        <div class="file-size">${formatBytes(getEntrySize(entry))}</div>
+                    </div>
                 </li>`;
             }).join('');
 
