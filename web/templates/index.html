@@ -1897,6 +1897,10 @@
         let visibleRange = { start: 0, end: 20 };
         let scrollContainer = null;
 
+        // Error helper UI state (preserve expand/collapse across rerenders)
+        const errorHelperExpanded = new Set();
+        const errorRawExpanded = new Set();
+
         // ========================================
         // Virtual Scroll Implementation
         // ========================================
@@ -2030,6 +2034,20 @@
             jobOrder = [];
             Object.values(statusIndex).forEach(set => set.clear());
             visibleRange = { start: 0, end: 20 };
+        }
+
+        function pruneErrorHelperState(jobs) {
+            const activeIds = new Set(jobs.map(job => job.id));
+            for (const id of errorHelperExpanded) {
+                if (!activeIds.has(id)) {
+                    errorHelperExpanded.delete(id);
+                }
+            }
+            for (const id of errorRawExpanded) {
+                if (!activeIds.has(id)) {
+                    errorRawExpanded.delete(id);
+                }
+            }
         }
 
         // Escape HTML to prevent XSS
@@ -2339,6 +2357,8 @@
             if (job.status !== 'failed') return '';
 
             const analysis = analyzeError(job);
+            const isExpanded = errorHelperExpanded.has(job.id);
+            const isRawExpanded = errorRawExpanded.has(job.id);
             const safeId = escapeHtml(job.id);
             const safeSummary = escapeHtml(analysis.summary);
             const safeMatched = analysis.matched ? escapeHtml(analysis.matched) : null;
@@ -2355,13 +2375,13 @@
             const confidenceClass = analysis.confidence;
 
             return `
-                <button class="error-helper-toggle" onclick="toggleErrorHelper('${safeId}')">
+                <button class="error-helper-toggle ${isExpanded ? 'expanded' : ''}" onclick="toggleErrorHelper('${safeId}')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg>
                     Explain error
                 </button>
-                <div class="error-helper-panel" id="error-helper-${safeId}">
+                <div class="error-helper-panel ${isExpanded ? 'expanded' : ''}" id="error-helper-${safeId}">
                     <div class="error-helper-summary">
                         <span class="error-helper-summary-text">${safeSummary}</span>
                         <span class="error-helper-confidence ${confidenceClass}">${analysis.confidence}</span>
@@ -2389,13 +2409,13 @@
                     </div>
 
                     <div class="error-helper-section">
-                        <button class="error-helper-raw-toggle" onclick="toggleRawOutput('${safeId}')">
+                        <button class="error-helper-raw-toggle ${isRawExpanded ? 'expanded' : ''}" onclick="toggleRawOutput('${safeId}')">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="6 9 12 15 18 9"></polyline>
                             </svg>
                             Show raw ffmpeg output
                         </button>
-                        <div class="error-helper-raw" id="error-raw-${safeId}">${safeStderr || 'No stderr output captured.'}</div>
+                        <div class="error-helper-raw ${isRawExpanded ? 'expanded' : ''}" id="error-raw-${safeId}">${safeStderr || 'No stderr output captured.'}</div>
                     </div>
                 </div>
             `;
@@ -2409,8 +2429,13 @@
             const toggle = document.querySelector(toggleSelector);
 
             if (panel && toggle) {
-                panel.classList.toggle('expanded');
-                toggle.classList.toggle('expanded');
+                const isExpanded = panel.classList.toggle('expanded');
+                toggle.classList.toggle('expanded', isExpanded);
+                if (isExpanded) {
+                    errorHelperExpanded.add(jobId);
+                } else {
+                    errorHelperExpanded.delete(jobId);
+                }
             }
         }
 
@@ -2422,8 +2447,13 @@
             const toggle = document.querySelector(toggleSelector);
 
             if (raw && toggle) {
-                raw.classList.toggle('expanded');
-                toggle.classList.toggle('expanded');
+                const isExpanded = raw.classList.toggle('expanded');
+                toggle.classList.toggle('expanded', isExpanded);
+                if (isExpanded) {
+                    errorRawExpanded.add(jobId);
+                } else {
+                    errorRawExpanded.delete(jobId);
+                }
             }
         }
 
@@ -2905,6 +2935,11 @@
                 }
             }
 
+            if (job.status !== 'failed') {
+                errorHelperExpanded.delete(job.id);
+                errorRawExpanded.delete(job.id);
+            }
+
             // If job completed, move it to the completed section
             if (job.status === 'complete') {
                 // Remove from main queue list
@@ -2938,6 +2973,7 @@
         function updateJobs(jobs) {
             const container = document.getElementById('queue-list');
             cachedJobs = jobs || [];
+            pruneErrorHelperState(cachedJobs);
 
             // Separate completed jobs from active queue
             const completedJobs = cachedJobs.filter(j => j.status === 'complete');
