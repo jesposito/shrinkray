@@ -1995,11 +1995,22 @@
         let currentPath = '';
         let selectedPaths = new Set();
         let fileListEntries = [];
+        const storageKeys = {
+            fileSort: 'shrinkray-file-sort',
+            fileFilter: 'shrinkray-file-filter',
+            hideEmptyFolders: 'shrinkray-hide-empty-folders',
+            selectedPreset: 'shrinkray-selected-preset',
+            includeSubfolders: 'shrinkray-include-subfolders',
+            notifyOnComplete: 'shrinkray-notify-on-complete',
+            clearRecentlyCompleted: 'shrinkray-clear-recently-completed'
+        };
+
         const fileListState = {
             sort: 'name',
             filter: 'all',
             hideEmptyFolders: false
         };
+        let preferredPresetId = localStorage.getItem(storageKeys.selectedPreset) || '';
         let eventSource = null;
         let cachedJobs = [];
 
@@ -2626,17 +2637,20 @@
 
         function updateFileSort(value) {
             fileListState.sort = value;
+            localStorage.setItem(storageKeys.fileSort, value);
             renderFileList();
         }
 
         function updateFileFilter(value) {
             fileListState.filter = value;
+            localStorage.setItem(storageKeys.fileFilter, value);
             updateEmptyFolderToggleVisibility();
             renderFileList();
         }
 
         function updateHideEmptyFolders(checked) {
             fileListState.hideEmptyFolders = checked;
+            localStorage.setItem(storageKeys.hideEmptyFolders, String(checked));
             renderFileList();
         }
 
@@ -2925,7 +2939,9 @@
         }
 
         function onPresetChange() {
-            // Preset changed - no action needed since estimation is removed
+            const preset = document.getElementById('preset-select').value;
+            preferredPresetId = preset;
+            localStorage.setItem(storageKeys.selectedPreset, preset);
         }
 
         async function startJobs() {
@@ -3026,7 +3042,12 @@
             const removeCompletedEl = document.getElementById('confirm-modal-remove-completed');
             if (options.showRemoveCompletedToggle) {
                 optionsEl.style.display = 'block';
-                removeCompletedEl.checked = options.removeCompletedDefault !== false;
+                const stored = localStorage.getItem(storageKeys.clearRecentlyCompleted);
+                if (stored !== null) {
+                    removeCompletedEl.checked = stored === 'true';
+                } else {
+                    removeCompletedEl.checked = options.removeCompletedDefault !== false;
+                }
             } else {
                 optionsEl.style.display = 'none';
                 removeCompletedEl.checked = true;
@@ -3697,6 +3718,7 @@
                 } else if (data.type === 'notify_sent') {
                     // Notification was sent, uncheck the checkbox
                     document.getElementById('notify-checkbox').checked = false;
+                    localStorage.setItem(storageKeys.notifyOnComplete, 'false');
                 } else if (data.type === 'batch_added' && data.jobs) {
                     // Performance: Handle batch of jobs in single DOM operation
                     handleBatchAdded(data.jobs);
@@ -3770,7 +3792,12 @@
                 const notifyCheckbox = document.getElementById('notify-checkbox');
                 if (config.pushover_configured || config.ntfy_configured) {
                     notifyContainer.style.display = 'flex';
-                    notifyCheckbox.checked = config.notify_on_complete || false;
+                    const storedNotify = localStorage.getItem(storageKeys.notifyOnComplete);
+                    const notifyValue = storedNotify !== null ? storedNotify === 'true' : (config.notify_on_complete || false);
+                    notifyCheckbox.checked = notifyValue;
+                    if (notifyValue !== (config.notify_on_complete || false)) {
+                        updateNotifySetting(notifyValue);
+                    }
                 } else {
                     notifyContainer.style.display = 'none';
                 }
@@ -3825,6 +3852,7 @@
         }
 
         async function updateNotifySetting(checked) {
+            localStorage.setItem(storageKeys.notifyOnComplete, String(checked));
             try {
                 await fetch('/api/config', {
                     method: 'PUT',
@@ -3895,9 +3923,49 @@
                 select.innerHTML = presets.map(p =>
                     `<option value="${p.id}">${p.name}</option>`
                 ).join('');
+                if (preferredPresetId && presets.some(p => p.id === preferredPresetId)) {
+                    select.value = preferredPresetId;
+                }
             } catch (err) {
                 console.error('Load presets error:', err);
             }
+        }
+
+        function loadLocalPreferences() {
+            const storedSort = localStorage.getItem(storageKeys.fileSort);
+            const storedFilter = localStorage.getItem(storageKeys.fileFilter);
+            const storedHideEmptyFolders = localStorage.getItem(storageKeys.hideEmptyFolders);
+
+            if (storedSort) {
+                fileListState.sort = storedSort;
+                document.getElementById('file-sort').value = storedSort;
+            }
+
+            if (storedFilter) {
+                fileListState.filter = storedFilter;
+                document.getElementById('file-filter').value = storedFilter;
+            }
+
+            if (storedHideEmptyFolders !== null) {
+                fileListState.hideEmptyFolders = storedHideEmptyFolders === 'true';
+            }
+
+            const includeSubfolders = localStorage.getItem(storageKeys.includeSubfolders);
+            if (includeSubfolders !== null) {
+                document.getElementById('include-subfolders').checked = includeSubfolders === 'true';
+            }
+
+            updateEmptyFolderToggleVisibility();
+        }
+
+        function bindPreferenceHandlers() {
+            document.getElementById('include-subfolders').addEventListener('change', (event) => {
+                localStorage.setItem(storageKeys.includeSubfolders, String(event.target.checked));
+            });
+
+            document.getElementById('confirm-modal-remove-completed').addEventListener('change', (event) => {
+                localStorage.setItem(storageKeys.clearRecentlyCompleted, String(event.target.checked));
+            });
         }
 
         // Keyboard shortcut for settings
@@ -3908,6 +3976,8 @@
         });
 
         // Initialize
+        loadLocalPreferences();
+        bindPreferenceHandlers();
         browse();
         connectSSE();
         loadSettings();
