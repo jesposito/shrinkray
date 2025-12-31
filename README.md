@@ -72,11 +72,20 @@ Access via the gear icon in the WebUI:
 - **Original files**: Delete after transcode, or keep as `.old`
 - **Concurrent jobs**: 1-6 simultaneous transcodes
 - **Pushover notifications**: Get notified when all jobs complete
+- **ntfy notifications**: Send notifications to an ntfy topic
 
 ## Pushover Notifications
 
 1. Create an app at [pushover.net](https://pushover.net)
 2. Enter your **User Key** and **App Token** in Settings
+3. Check **"Notify when done"** in the queue header before starting jobs
+
+You'll receive a notification with job counts and total space saved when the queue empties.
+
+## ntfy Notifications
+
+1. Pick an ntfy server (default: `https://ntfy.sh`) and topic
+2. Enter the server, topic, and optional token in Settings
 3. Check **"Notify when done"** in the queue header before starting jobs
 
 You'll receive a notification with job counts and total space saved when the queue empties.
@@ -95,6 +104,9 @@ Config is stored in `/config/shrinkray.yaml`. Most settings are available in the
 | `ffprobe_path` | `ffprobe` | Path to ffprobe binary |
 | `pushover_user_key` | *(empty)* | Pushover user key for notifications |
 | `pushover_app_token` | *(empty)* | Pushover application token for notifications |
+| `ntfy_server` | `https://ntfy.sh` | ntfy server URL for notifications |
+| `ntfy_topic` | *(empty)* | ntfy topic for notifications |
+| `ntfy_token` | *(empty)* | ntfy access token (optional) |
 
 Example:
 

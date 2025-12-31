@@ -14,6 +14,7 @@ import (
 	"github.com/gwlsn/shrinkray/internal/config"
 	"github.com/gwlsn/shrinkray/internal/ffmpeg"
 	"github.com/gwlsn/shrinkray/internal/jobs"
+	"github.com/gwlsn/shrinkray/internal/ntfy"
 	"github.com/gwlsn/shrinkray/internal/pushover"
 )
 
@@ -25,6 +26,7 @@ type Handler struct {
 	cfg        *config.Config
 	cfgPath    string
 	pushover   *pushover.Client
+	ntfy       *ntfy.Client
 	notifyMu   sync.Mutex // Protects notification sending to prevent duplicates
 }
 
@@ -37,6 +39,7 @@ func NewHandler(browser *browse.Browser, queue *jobs.Queue, workerPool *jobs.Wor
 		cfg:        cfg,
 		cfgPath:    cfgPath,
 		pushover:   pushover.NewClient(cfg.PushoverUserKey, cfg.PushoverAppToken),
+		ntfy:       ntfy.NewClient(cfg.NtfyServer, cfg.NtfyTopic, cfg.NtfyToken),
 	}
 }
 
@@ -270,6 +273,10 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		"pushover_user_key":   h.cfg.PushoverUserKey,
 		"pushover_app_token":  h.cfg.PushoverAppToken,
 		"pushover_configured": h.pushover.IsConfigured(),
+		"ntfy_server":         h.cfg.NtfyServer,
+		"ntfy_topic":          h.cfg.NtfyTopic,
+		"ntfy_token":          h.cfg.NtfyToken,
+		"ntfy_configured":     h.ntfy.IsConfigured(),
 		"notify_on_complete":  h.cfg.NotifyOnComplete,
 		// Feature flags for frontend
 		"features": map[string]bool{
@@ -288,6 +295,9 @@ type UpdateConfigRequest struct {
 	Workers          *int    `json:"workers,omitempty"`
 	PushoverUserKey  *string `json:"pushover_user_key,omitempty"`
 	PushoverAppToken *string `json:"pushover_app_token,omitempty"`
+	NtfyServer       *string `json:"ntfy_server,omitempty"`
+	NtfyTopic        *string `json:"ntfy_topic,omitempty"`
+	NtfyToken        *string `json:"ntfy_token,omitempty"`
 	NotifyOnComplete *bool   `json:"notify_on_complete,omitempty"`
 }
 
@@ -326,6 +336,18 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		h.cfg.PushoverAppToken = *req.PushoverAppToken
 		h.pushover.AppToken = *req.PushoverAppToken
 	}
+	if req.NtfyServer != nil {
+		h.cfg.NtfyServer = *req.NtfyServer
+		h.ntfy.ServerURL = *req.NtfyServer
+	}
+	if req.NtfyTopic != nil {
+		h.cfg.NtfyTopic = *req.NtfyTopic
+		h.ntfy.Topic = *req.NtfyTopic
+	}
+	if req.NtfyToken != nil {
+		h.cfg.NtfyToken = *req.NtfyToken
+		h.ntfy.Token = *req.NtfyToken
+	}
 	if req.NotifyOnComplete != nil {
 		h.cfg.NotifyOnComplete = *req.NotifyOnComplete
 	}
@@ -361,6 +383,21 @@ func (h *Handler) TestPushover(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.pushover.Test(); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "Test notification sent"})
+}
+
+// TestNtfy handles POST /api/ntfy/test
+func (h *Handler) TestNtfy(w http.ResponseWriter, r *http.Request) {
+	if !h.ntfy.IsConfigured() {
+		writeError(w, http.StatusBadRequest, "ntfy credentials not configured")
+		return
+	}
+
+	if err := h.ntfy.Test(); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}

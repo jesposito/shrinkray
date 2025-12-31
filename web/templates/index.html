@@ -1769,6 +1769,45 @@
                             <button class="btn btn-secondary btn-sm" id="test-pushover-btn" onclick="testPushover()">Test</button>
                         </div>
                     </div>
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <div class="setting-name">ntfy Server</div>
+                            <div class="setting-desc">Server URL (default: https://ntfy.sh)</div>
+                        </div>
+                        <div class="setting-control">
+                            <input type="text" class="setting-input" id="setting-ntfy-server"
+                                   placeholder="https://ntfy.sh" onchange="updateSetting('ntfy_server', this.value)">
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <div class="setting-name">ntfy Topic</div>
+                            <div class="setting-desc">Topic name for notifications</div>
+                        </div>
+                        <div class="setting-control">
+                            <input type="text" class="setting-input" id="setting-ntfy-topic"
+                                   placeholder="Enter topic" onchange="updateSetting('ntfy_topic', this.value)">
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <div class="setting-name">ntfy Token</div>
+                            <div class="setting-desc">Optional access token</div>
+                        </div>
+                        <div class="setting-control">
+                            <input type="text" class="setting-input" id="setting-ntfy-token"
+                                   placeholder="Enter token (optional)" onchange="updateSetting('ntfy_token', this.value)">
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <div class="setting-name">Test ntfy</div>
+                            <div class="setting-desc">Send a test to verify setup</div>
+                        </div>
+                        <div class="setting-control">
+                            <button class="btn btn-secondary btn-sm" id="test-ntfy-btn" onclick="testNtfy()">Test</button>
+                        </div>
+                    </div>
                 </div>
                 <div class="setting-group">
                     <div class="setting-group-title">Fun</div>
@@ -3488,10 +3527,15 @@
                 document.getElementById('setting-pushover-user').value = config.pushover_user_key || '';
                 document.getElementById('setting-pushover-token').value = config.pushover_app_token || '';
 
-                // Show/hide notify checkbox based on whether Pushover is configured
+                // ntfy settings
+                document.getElementById('setting-ntfy-server').value = config.ntfy_server || '';
+                document.getElementById('setting-ntfy-topic').value = config.ntfy_topic || '';
+                document.getElementById('setting-ntfy-token').value = config.ntfy_token || '';
+
+                // Show/hide notify checkbox based on whether any provider is configured
                 const notifyContainer = document.getElementById('notify-container');
                 const notifyCheckbox = document.getElementById('notify-checkbox');
-                if (config.pushover_configured) {
+                if (config.pushover_configured || config.ntfy_configured) {
                     notifyContainer.style.display = 'flex';
                     notifyCheckbox.checked = config.notify_on_complete || false;
                 } else {
@@ -3538,7 +3582,7 @@
                 setTimeout(() => { statusEl.textContent = ''; }, 2000);
 
                 // Reload settings to update notify checkbox visibility
-                if (key === 'pushover_user_key' || key === 'pushover_app_token') {
+                if (key === 'pushover_user_key' || key === 'pushover_app_token' || key === 'ntfy_server' || key === 'ntfy_topic' || key === 'ntfy_token') {
                     loadSettings();
                 }
             } catch (err) {
@@ -3567,6 +3611,32 @@
 
             try {
                 const resp = await fetch('/api/pushover/test', { method: 'POST' });
+                const data = await resp.json();
+
+                if (!resp.ok) {
+                    throw new Error(data.error || 'Failed to send test');
+                }
+
+                statusEl.textContent = 'Test notification sent!';
+                statusEl.className = 'settings-status';
+                setTimeout(() => { statusEl.textContent = ''; }, 3000);
+            } catch (err) {
+                statusEl.textContent = `Error: ${err.message}`;
+                statusEl.className = 'settings-status error';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Test';
+            }
+        }
+
+        async function testNtfy() {
+            const btn = document.getElementById('test-ntfy-btn');
+            const statusEl = document.getElementById('settings-status');
+            btn.disabled = true;
+            btn.textContent = 'Sending...';
+
+            try {
+                const resp = await fetch('/api/ntfy/test', { method: 'POST' });
                 const data = await resp.json();
 
                 if (!resp.ok) {
