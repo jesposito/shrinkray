@@ -3582,6 +3582,8 @@
             const isInitializing = jobData.progress === 0 && jobData.speed === 0;
             const safeEta = escapeHtml(jobData.eta) || '...';
 
+            updateCachedJobProgress(jobData.id, jobData.progress, jobData.speed, jobData.eta);
+
             // Update active panel - find the specific job item by ID
             const nowProcessingContent = document.getElementById('now-processing-content');
             const safeId = escapeCssSelector(jobData.id);
@@ -3653,13 +3655,24 @@
                     statusBadge.textContent = isInitializing ? 'Initializing' : 'Running';
                 }
             }
+        }
 
-            // Update cached job data
-            const cachedJob = cachedJobs.find(j => j.id === jobData.id);
+        function updateCachedJobProgress(id, progress, speed, eta) {
+            const cachedJob = cachedJobs.find(j => j.id === id);
             if (cachedJob) {
-                cachedJob.progress = jobData.progress;
-                cachedJob.speed = jobData.speed;
-                cachedJob.eta = jobData.eta;
+                cachedJob.progress = progress;
+                cachedJob.speed = speed;
+                cachedJob.eta = eta;
+            }
+
+            if (virtualScrollEnabled) {
+                const jobInMap = jobMap.get(id);
+                if (jobInMap) {
+                    jobInMap.progress = progress;
+                    jobInMap.speed = speed;
+                    jobInMap.eta = eta;
+                    jobMap.set(id, jobInMap);
+                }
             }
         }
 
@@ -3714,12 +3727,7 @@
             const safeEta = escapeHtml(eta) || '...';
 
             // Update cached job
-            const cachedJob = cachedJobs.find(j => j.id === id);
-            if (cachedJob) {
-                cachedJob.progress = progress;
-                cachedJob.speed = speed;
-                cachedJob.eta = eta;
-            }
+            updateCachedJobProgress(id, progress, speed, eta);
 
             // Update active panel job
             const safeId = escapeCssSelector(id);
