@@ -621,6 +621,9 @@ func (q *Queue) CompleteJob(id string, outputPath string, outputSize int64) erro
 	job.TranscodeTime = int64(job.CompletedAt.Sub(job.StartedAt).Seconds())
 	job.TempPath = "" // Clear temp path
 	q.recordProcessedPathLocked(job.InputPath, job.CompletedAt)
+	if outputPath != "" {
+		q.recordProcessedPathLocked(outputPath, job.CompletedAt)
+	}
 
 	if wasComplete {
 		q.totalSaved += job.SpaceSaved - previousSaved
