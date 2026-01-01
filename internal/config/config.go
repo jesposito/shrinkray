@@ -86,6 +86,9 @@ type Config struct {
 	// NotifyOnComplete triggers a notification when all jobs finish
 	NotifyOnComplete bool `yaml:"notify_on_complete"`
 
+	// HideProcessingTmp controls hiding .trickplay.tmp files from the UI
+	HideProcessingTmp bool `yaml:"hide_processing_tmp"`
+
 	// Features contains feature flags for phased rollout of new functionality
 	Features FeatureFlags `yaml:"features"`
 

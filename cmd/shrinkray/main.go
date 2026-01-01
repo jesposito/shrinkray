@@ -119,6 +119,7 @@ func main() {
 	// Initialize components
 	prober := ffmpeg.NewProber(cfg.FFprobePath)
 	browser := browse.NewBrowser(prober, cfg.MediaPath)
+	browser.SetHideProcessingTmp(cfg.HideProcessingTmp)
 
 	queue, err := jobs.NewQueue(cfg.QueueFile)
 	if err != nil {
