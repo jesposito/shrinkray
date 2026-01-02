@@ -184,7 +184,7 @@ func (p *Provider) HandleLogin(w http.ResponseWriter, r *http.Request) error {
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 		Expires:  expires,
-		Secure:   r.TLS != nil,
+		Secure:   isSecureRequest(r),
 	})
 
 	loginURL := p.oauth2Config.AuthCodeURL(state, oidc.Nonce(nonce))
@@ -276,7 +276,7 @@ func (p *Provider) HandleCallback(w http.ResponseWriter, r *http.Request) error 
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 		Expires:  expiry,
-		Secure:   r.TLS != nil,
+		Secure:   isSecureRequest(r),
 	})
 
 	http.Redirect(w, r, "/", http.StatusFound)
@@ -315,7 +315,7 @@ func (p *Provider) ClearSession(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   -1,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   r.TLS != nil,
+		Secure:   isSecureRequest(r),
 	})
 }
 
@@ -487,6 +487,13 @@ func generateNonce() (string, error) {
 
 func baseURL(r *http.Request) string {
 	scheme := "http"
+	host := r.Host
+	if forwardedHost := r.Header.Get("X-Forwarded-Host"); forwardedHost != "" {
+		parts := strings.Split(forwardedHost, ",")
+		if len(parts) > 0 && strings.TrimSpace(parts[0]) != "" {
+			host = strings.TrimSpace(parts[0])
+		}
+	}
 	if forwarded := r.Header.Get("X-Forwarded-Proto"); forwarded != "" {
 		parts := strings.Split(forwarded, ",")
 		if len(parts) > 0 && strings.TrimSpace(parts[0]) != "" {
@@ -495,7 +502,17 @@ func baseURL(r *http.Request) string {
 	} else if r.TLS != nil {
 		scheme = "https"
 	}
-	return fmt.Sprintf("%s://%s", scheme, r.Host)
+	return fmt.Sprintf("%s://%s", scheme, host)
+}
+
+func isSecureRequest(r *http.Request) bool {
+	if forwarded := r.Header.Get("X-Forwarded-Proto"); forwarded != "" {
+		parts := strings.Split(forwarded, ",")
+		if len(parts) > 0 && strings.TrimSpace(parts[0]) != "" {
+			return strings.EqualFold(strings.TrimSpace(parts[0]), "https")
+		}
+	}
+	return r.TLS != nil
 }
 
 func clearStateCookie(w http.ResponseWriter, name string) {

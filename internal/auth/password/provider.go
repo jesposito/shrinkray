@@ -312,7 +312,7 @@ func (p *Provider) HandleLogin(w http.ResponseWriter, r *http.Request) error {
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 		Expires:  expires,
-		Secure:   r.TLS != nil,
+		Secure:   isSecureRequest(r),
 	})
 
 	if strings.Contains(r.Header.Get("Accept"), "text/html") {
@@ -339,8 +339,18 @@ func (p *Provider) ClearSession(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   -1,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   r.TLS != nil,
+		Secure:   isSecureRequest(r),
 	})
+}
+
+func isSecureRequest(r *http.Request) bool {
+	if forwarded := r.Header.Get("X-Forwarded-Proto"); forwarded != "" {
+		parts := strings.Split(forwarded, ",")
+		if len(parts) > 0 && strings.TrimSpace(parts[0]) != "" {
+			return strings.EqualFold(strings.TrimSpace(parts[0]), "https")
+		}
+	}
+	return r.TLS != nil
 }
 
 func (p *Provider) verifyPassword(username, password string) (bool, error) {
