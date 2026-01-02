@@ -337,7 +337,7 @@ func (p *Provider) ensureStateCookie(w http.ResponseWriter, r *http.Request) (st
 		Value:    encoded,
 		Path:     "/",
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: stateCookieSameSite(r),
 		Expires:  expires,
 		Secure:   isSecureRequest(r),
 	})
@@ -538,6 +538,13 @@ func isSecureRequest(r *http.Request) bool {
 		}
 	}
 	return r.TLS != nil
+}
+
+func stateCookieSameSite(r *http.Request) http.SameSite {
+	if isSecureRequest(r) {
+		return http.SameSiteNoneMode
+	}
+	return http.SameSiteLaxMode
 }
 
 func clearStateCookie(w http.ResponseWriter, name string) {
