@@ -2956,12 +2956,19 @@
             return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[unitIndex]}`;
         }
 
+        function getJobTimeMs(value) {
+            if (!value) return null;
+            const parsed = new Date(value);
+            const ms = parsed.getTime();
+            if (Number.isNaN(ms)) return null;
+            return ms;
+        }
+
         function getStartedAtMs(job) {
-            if (!job || !job.started_at) return null;
-            const started = new Date(job.started_at);
-            const startedMs = started.getTime();
-            if (Number.isNaN(startedMs)) return null;
-            return startedMs;
+            if (!job) return null;
+            const startedMs = getJobTimeMs(job.started_at);
+            if (startedMs !== null) return startedMs;
+            return getJobTimeMs(job.created_at);
         }
 
         function ensureLocalStartedAt(job, startedMs) {
@@ -3044,6 +3051,26 @@
                 const elapsedDetail = elapsedEl.closest('.job-detail');
                 if (elapsedDetail) {
                     elapsedDetail.remove();
+                }
+            }
+        }
+
+        function updateElapsedDisplays() {
+            if (!cachedJobs || cachedJobs.length === 0) return;
+            for (const job of cachedJobs) {
+                if (!job || job.status !== 'running') continue;
+                const elapsed = formatElapsed(job);
+                if (!elapsed) continue;
+                const safeId = escapeCssSelector(job.id);
+                const elapsedSelectors = [
+                    `#now-processing-content .active-job-item[data-job-id="${safeId}"] [data-role="elapsed"]`,
+                    `#queue-list .job-item[data-job-id="${safeId}"] [data-role="elapsed"]`,
+                ];
+                for (const selector of elapsedSelectors) {
+                    const elapsedEl = document.querySelector(selector);
+                    if (elapsedEl) {
+                        elapsedEl.textContent = elapsed;
+                    }
                 }
             }
         }
@@ -4933,6 +4960,7 @@
         browse(initialPath, false, { updateHistory: false });
         attachQueueDragHandlers();
         connectSSE();
+        setInterval(updateElapsedDisplays, 1000);
         loadSettings();
         loadPresets();
 
