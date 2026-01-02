@@ -184,7 +184,7 @@ func (p *Provider) HandleCallback(w http.ResponseWriter, r *http.Request) error 
 		return errors.New("invalid state")
 	}
 
-	clearStateCookie(w, p.stateCookieName)
+	clearStateCookie(w, r, p.stateCookieName)
 
 	token, err := p.oauth2Config.Exchange(r.Context(), code)
 	if err != nil {
@@ -531,13 +531,21 @@ func isSecureRequest(r *http.Request) bool {
 	return r.TLS != nil
 }
 
-func clearStateCookie(w http.ResponseWriter, name string) {
+func stateCookieSameSite(r *http.Request) http.SameSite {
+	if isSecureRequest(r) {
+		return http.SameSiteNoneMode
+	}
+	return http.SameSiteLaxMode
+}
+
+func clearStateCookie(w http.ResponseWriter, r *http.Request, name string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     name,
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: stateCookieSameSite(r),
+		Secure:   isSecureRequest(r),
 	})
 }
