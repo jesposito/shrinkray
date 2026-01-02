@@ -26,6 +26,7 @@ type Entry struct {
 	TotalSize      int64               `json:"total_size,omitempty"` // For directories: total size of video files
 	Processed      bool                `json:"processed,omitempty"`  // For video files: true if already processed
 	ProcessedCount int                 `json:"processed_count"`      // For directories: number of processed video files
+	Pending        bool                `json:"pending,omitempty"`    // True if queued for processing
 }
 
 // BrowseResult contains the result of browsing a directory

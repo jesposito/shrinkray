@@ -88,6 +88,19 @@ func (h *Handler) Browse(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	pendingPaths := h.queue.PendingPaths()
+	if len(pendingPaths) > 0 {
+		for _, entry := range result.Entries {
+			if entry.IsDir {
+				entry.Pending = hasPendingInDir(entry.Path, pendingPaths, h.cfg.HideProcessingTmp)
+				continue
+			}
+			if _, ok := pendingPaths[entry.Path]; ok {
+				entry.Pending = true
+			}
+		}
+	}
+
 	writeJSON(w, http.StatusOK, result)
 }
 
@@ -109,6 +122,25 @@ func countProcessedInDir(dirPath string, processedPaths map[string]struct{}, hid
 		}
 	}
 	return count
+}
+
+func hasPendingInDir(dirPath string, pendingPaths map[string]struct{}, hideProcessingTmp bool) bool {
+	if len(pendingPaths) == 0 {
+		return false
+	}
+	prefix := dirPath + string(os.PathSeparator)
+	for path := range pendingPaths {
+		if strings.HasPrefix(path, prefix) {
+			if hideProcessingTmp {
+				lowerPath := strings.ToLower(path)
+				if strings.HasSuffix(lowerPath, "shrinkray.tmp") || strings.Contains(lowerPath, ".shrinkray.tmp.") {
+					continue
+				}
+			}
+			return true
+		}
+	}
+	return false
 }
 
 // Presets handles GET /api/presets

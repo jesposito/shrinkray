@@ -571,6 +571,24 @@
             color: #cbd5e1;
         }
 
+        .queued-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 0.6875rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+            background: rgba(99, 102, 241, 0.16);
+            color: #4338ca;
+        }
+
+        [data-theme="dark"] .queued-tag {
+            background: rgba(99, 102, 241, 0.25);
+            color: #c7d2fe;
+        }
+
         .file-list-empty {
             padding: 60px 20px;
             text-align: center;
@@ -3166,11 +3184,16 @@
                 const count = entry.file_count || 0;
                 const processed = entry.processed_count || 0;
                 const isFullyProcessed = entry.is_dir ? count > 0 && processed === count : entry.processed;
-                const statusTag = isVideo
-                    ? `<span class="${isFullyProcessed ? 'processed-tag' : 'unprocessed-tag'}">${isFullyProcessed ? 'Processed' : 'Unprocessed'}</span>`
-                    : isFullyProcessed
-                        ? '<span class="processed-tag">Processed</span>'
-                        : '';
+                const statusTags = [];
+                if (entry.pending) {
+                    statusTags.push('<span class="queued-tag">Queued</span>');
+                }
+                if (isVideo) {
+                    statusTags.push(`<span class="${isFullyProcessed ? 'processed-tag' : 'unprocessed-tag'}">${isFullyProcessed ? 'Processed' : 'Unprocessed'}</span>`);
+                } else if (isFullyProcessed) {
+                    statusTags.push('<span class="processed-tag">Processed</span>');
+                }
+                const statusTag = statusTags.join('');
                 const videoInfoButton = isVideo
                     ? `<button class="btn btn-secondary btn-sm file-action-btn" data-path="${escapeHtml(entry.path)}" onclick="handleVideoInfoClick(event, this)" title="Video info" aria-label="Video info">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

@@ -665,6 +665,25 @@ func (q *Queue) ProcessedPaths() map[string]struct{} {
 	return paths
 }
 
+// PendingPaths returns a copy of input paths for pending jobs.
+func (q *Queue) PendingPaths() map[string]struct{} {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+
+	paths := make(map[string]struct{})
+	for _, job := range q.jobs {
+		if job.Status != StatusPending && job.Status != StatusPendingProbe {
+			continue
+		}
+		absPath, err := filepath.Abs(job.InputPath)
+		if err != nil {
+			absPath = job.InputPath
+		}
+		paths[absPath] = struct{}{}
+	}
+	return paths
+}
+
 // MarkProcessedPaths records input paths as processed.
 // Returns the number of new entries added.
 func (q *Queue) MarkProcessedPaths(paths []string) int {
