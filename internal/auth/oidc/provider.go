@@ -127,23 +127,6 @@ func (p *Provider) Authenticate(r *http.Request) (*auth.User, error) {
 	if expiry.Before(time.Now()) {
 		return nil, auth.ErrSessionExpired
 	}
-	if session.AccessToken == "" {
-		return nil, auth.ErrSessionInvalid
-	}
-	if session.AccessTokenExpiresAt != 0 && time.Unix(session.AccessTokenExpiresAt, 0).Before(time.Now()) {
-		return nil, auth.ErrSessionExpired
-	}
-	token := &oauth2.Token{
-		AccessToken: session.AccessToken,
-		TokenType:   "Bearer",
-	}
-	if session.AccessTokenExpiresAt != 0 {
-		token.Expiry = time.Unix(session.AccessTokenExpiresAt, 0)
-	}
-	_, err = p.oidcProvider.UserInfo(r.Context(), p.oauth2Config.TokenSource(r.Context(), token))
-	if err != nil {
-		return nil, auth.ErrSessionInvalid
-	}
 	return &auth.User{
 		ID:    session.Subject,
 		Email: session.Email,
@@ -222,15 +205,10 @@ func (p *Provider) HandleCallback(w http.ResponseWriter, r *http.Request) error 
 	}
 
 	session := sessionPayload{
-		Subject:     subject,
-		Email:       email,
-		Name:        name,
-		ExpiresAt:   expiry.Unix(),
-		AccessToken: token.AccessToken,
-		IDToken:     rawIDToken,
-	}
-	if !token.Expiry.IsZero() {
-		session.AccessTokenExpiresAt = token.Expiry.Unix()
+		Subject:   subject,
+		Email:     email,
+		Name:      name,
+		ExpiresAt: expiry.Unix(),
 	}
 	encoded, err := p.signSessionPayload(session)
 	if err != nil {
@@ -253,16 +231,12 @@ func (p *Provider) HandleCallback(w http.ResponseWriter, r *http.Request) error 
 
 // HandleLogout clears the session cookie and triggers provider logout when available.
 func (p *Provider) HandleLogout(w http.ResponseWriter, r *http.Request) error {
-	session, _ := p.sessionFromRequest(r)
 	p.ClearSession(w, r)
 
 	if p.endSessionURL != "" {
 		endURL, err := url.Parse(p.endSessionURL)
 		if err == nil {
 			query := endURL.Query()
-			if session.IDToken != "" {
-				query.Set("id_token_hint", session.IDToken)
-			}
 			query.Set("post_logout_redirect_uri", baseURL(r)+"/")
 			endURL.RawQuery = query.Encode()
 			http.Redirect(w, r, endURL.String(), http.StatusFound)
@@ -285,22 +259,6 @@ func (p *Provider) ClearSession(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 		Secure:   isSecureRequest(r),
 	})
-}
-
-func (p *Provider) sessionFromRequest(r *http.Request) (sessionPayload, error) {
-	cookie, err := r.Cookie(p.cookieName)
-	if err != nil {
-		return sessionPayload{}, err
-	}
-	payload, err := p.verifySignedValue(cookie.Value)
-	if err != nil {
-		return sessionPayload{}, err
-	}
-	var session sessionPayload
-	if err := json.Unmarshal(payload, &session); err != nil {
-		return sessionPayload{}, err
-	}
-	return session, nil
 }
 
 func (p *Provider) ensureStateCookie(w http.ResponseWriter, r *http.Request) (string, string, error) {
@@ -358,13 +316,10 @@ type statePayload struct {
 }
 
 type sessionPayload struct {
-	Subject              string `json:"sub"`
-	Email                string `json:"email"`
-	Name                 string `json:"name"`
-	ExpiresAt            int64  `json:"expires_at"`
-	AccessToken          string `json:"access_token,omitempty"`
-	AccessTokenExpiresAt int64  `json:"access_token_expires_at,omitempty"`
-	IDToken              string `json:"id_token,omitempty"`
+	Subject   string `json:"sub"`
+	Email     string `json:"email"`
+	Name      string `json:"name"`
+	ExpiresAt int64  `json:"expires_at"`
 }
 
 func (p *Provider) signStatePayload(payload statePayload) (string, error) {
