@@ -4,7 +4,13 @@ on:
   push:
     branches:
       - main
+      - 'claude/**'  # Build branches for testing before merge
   workflow_dispatch:
+    inputs:
+      custom_tag:
+        description: 'Custom tag for testing (e.g., yuv444p)'
+        required: false
+        default: ''
 
 env:
   REGISTRY: ghcr.io
@@ -38,8 +44,13 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=latest
+            # On main branch: tag as 'latest' and short SHA
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=sha,prefix=,format=short
+            # On feature branches: use branch name as tag (sanitized)
+            type=ref,event=branch,enable=${{ github.ref != 'refs/heads/main' }}
+            # Custom tag from workflow_dispatch
+            type=raw,value=${{ github.event.inputs.custom_tag }},enable=${{ github.event.inputs.custom_tag != '' }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
