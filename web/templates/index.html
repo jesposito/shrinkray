@@ -708,6 +708,11 @@
             font-size: 0.8125rem;
         }
 
+        .btn-xs {
+            padding: 4px 8px;
+            font-size: 0.75rem;
+        }
+
         .file-action-btn {
             padding: 4px 8px;
             font-size: 0.6875rem;
@@ -1770,6 +1775,214 @@
             font-size: 0.75rem;
         }
 
+        /* Skipped Section Styles */
+        .skipped-section {
+            border-top: 1px solid var(--border);
+            padding: 12px;
+            background: var(--bg-tertiary);
+        }
+
+        .skipped-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            padding: 4px 0;
+            user-select: none;
+        }
+
+        .skipped-header:hover {
+            color: var(--accent);
+        }
+
+        .skipped-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .skipped-count {
+            background: rgba(150, 150, 150, 0.15);
+            color: var(--text-secondary);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .skipped-toggle {
+            color: var(--text-tertiary);
+            transition: transform var(--transition-fast);
+        }
+
+        .skipped-toggle.expanded {
+            transform: rotate(180deg);
+        }
+
+        .skipped-list {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height var(--transition-normal);
+        }
+
+        .skipped-list.expanded {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .skipped-item {
+            display: flex;
+            flex-direction: column;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.8125rem;
+            gap: 8px;
+        }
+
+        .skipped-item:last-child {
+            border-bottom: none;
+        }
+
+        .skipped-item-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .skipped-item-name {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .skipped-item-reason {
+            color: var(--text-tertiary);
+            font-size: 0.75rem;
+        }
+
+        .skipped-item-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .skipped-item-badge {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.6875rem;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .skipped-item-badge.skipped {
+            background: rgba(150, 150, 150, 0.15);
+            color: var(--text-secondary);
+        }
+
+        .skipped-item-badge.no-gain {
+            background: rgba(234, 179, 8, 0.15);
+            color: #b45309;
+        }
+
+        /* Failed Section Styles */
+        .failed-section {
+            border-top: 1px solid var(--border);
+            padding: 12px;
+            background: var(--bg-tertiary);
+        }
+
+        .failed-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            padding: 4px 0;
+            user-select: none;
+        }
+
+        .failed-header:hover {
+            color: var(--accent);
+        }
+
+        .failed-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .failed-count {
+            background: var(--error-light);
+            color: var(--error);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .failed-toggle {
+            color: var(--text-tertiary);
+            transition: transform var(--transition-fast);
+        }
+
+        .failed-toggle.expanded {
+            transform: rotate(180deg);
+        }
+
+        .failed-list {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height var(--transition-normal);
+        }
+
+        .failed-list.expanded {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .failed-item {
+            display: flex;
+            flex-direction: column;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.8125rem;
+            gap: 8px;
+        }
+
+        .failed-item:last-child {
+            border-bottom: none;
+        }
+
+        .failed-item-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .failed-item-name {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .failed-item-error {
+            color: var(--error);
+            font-size: 0.75rem;
+        }
+
+        .failed-item-actions {
+            display: flex;
+            gap: 8px;
+        }
+
         /* Virtual Scrolling - Only visible items are rendered to DOM */
         .virtual-scroll-container {
             position: relative;
@@ -1978,6 +2191,32 @@
                                 <div>No jobs in queue</div>
                                 <div style="font-size: 0.8125rem; margin-top: 4px; color: var(--text-tertiary)">Select files and start transcoding</div>
                             </div>
+                        </div>
+                        <!-- Skipped Jobs Section -->
+                        <div class="skipped-section" id="skipped-section" style="display: none;">
+                            <div class="skipped-header" onclick="toggleSkippedSection()">
+                                <div class="skipped-title">
+                                    <span>Skipped</span>
+                                    <span class="skipped-count" id="skipped-count">0</span>
+                                </div>
+                                <svg class="skipped-toggle" id="skipped-toggle" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </div>
+                            <div class="skipped-list" id="skipped-list"></div>
+                        </div>
+                        <!-- Failed Jobs Section -->
+                        <div class="failed-section" id="failed-section" style="display: none;">
+                            <div class="failed-header" onclick="toggleFailedSection()">
+                                <div class="failed-title">
+                                    <span>Failed</span>
+                                    <span class="failed-count" id="failed-count">0</span>
+                                </div>
+                                <svg class="failed-toggle" id="failed-toggle" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </div>
+                            <div class="failed-list" id="failed-list"></div>
                         </div>
                         <!-- Completed Jobs Section -->
                         <div class="completed-section" id="completed-section" style="display: none;">
@@ -2276,7 +2515,7 @@
         const REFRESH_DEBOUNCE_MS = 100; // Max 10 refreshes per second
 
         // Performance: Track stats locally to avoid fetching on every update
-        let cachedStats = { pending: 0, pending_probe: 0, running: 0, complete: 0, failed: 0, total_saved: 0 };
+        let cachedStats = { pending: 0, pending_probe: 0, running: 0, complete: 0, failed: 0, skipped: 0, no_gain: 0, total_saved: 0 };
 
         // Feature flags (loaded from server config)
         let featureFlags = {
@@ -2299,7 +2538,9 @@
             running: new Set(),
             complete: new Set(),
             failed: new Set(),
-            cancelled: new Set()
+            cancelled: new Set(),
+            skipped: new Set(),
+            no_gain: new Set()
         };
 
         // Virtual scroll configuration
@@ -4083,12 +4324,22 @@
                 ensureLocalStartedAt(job, getStartedAtMs(job));
             }
 
-            // Separate completed jobs from active queue
+            // Separate jobs by status for different sections
             const completedJobs = cachedJobs.filter(j => j.status === 'complete');
-            const activeJobs = cachedJobs.filter(j => j.status !== 'complete');
+            const skippedJobs = cachedJobs.filter(j => j.status === 'skipped' || j.status === 'no_gain');
+            const failedJobs = cachedJobs.filter(j => j.status === 'failed');
+            // Active jobs are pending, running, pending_probe, and cancelled (but not completed, skipped, failed, no_gain)
+            const activeJobs = cachedJobs.filter(j =>
+                j.status !== 'complete' &&
+                j.status !== 'skipped' &&
+                j.status !== 'no_gain' &&
+                j.status !== 'failed'
+            );
 
-            // Update completed section (compact view)
+            // Update sections (compact views)
             updateCompletedSection(completedJobs);
+            updateSkippedSection(skippedJobs);
+            updateFailedSection(failedJobs);
 
             // Update virtual scroll state (only for active jobs)
             if (virtualScrollEnabled) {
@@ -4312,6 +4563,181 @@
                     </div>
                 `;
             }).join('');
+        }
+
+        function toggleSkippedSection() {
+            const list = document.getElementById('skipped-list');
+            const toggle = document.getElementById('skipped-toggle');
+            const isExpanded = list.classList.contains('expanded');
+
+            if (isExpanded) {
+                list.classList.remove('expanded');
+                toggle.classList.remove('expanded');
+            } else {
+                list.classList.add('expanded');
+                toggle.classList.add('expanded');
+            }
+        }
+
+        function updateSkippedSection(skippedJobs) {
+            const section = document.getElementById('skipped-section');
+            const countEl = document.getElementById('skipped-count');
+            const listEl = document.getElementById('skipped-list');
+
+            if (!skippedJobs || skippedJobs.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = 'block';
+            countEl.textContent = skippedJobs.length;
+
+            // Sort by completed_at (newest first)
+            const sortedJobs = skippedJobs
+                .sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at))
+                .slice(0, 50);
+
+            listEl.innerHTML = sortedJobs.map(job => {
+                const filename = job.input_path.split('/').pop();
+                const safeFilename = escapeHtml(filename);
+                const badgeClass = job.status === 'no_gain' ? 'no-gain' : 'skipped';
+                const badgeText = job.status === 'no_gain' ? 'No Gain' : 'Skipped';
+                const reason = job.error || 'Unknown reason';
+                return `
+                    <div class="skipped-item" data-job-id="${job.id}">
+                        <div class="skipped-item-header">
+                            <span class="skipped-item-name" title="${escapeHtml(job.input_path)}">${safeFilename}</span>
+                            <span class="skipped-item-badge ${badgeClass}">${badgeText}</span>
+                        </div>
+                        <div class="skipped-item-reason">${escapeHtml(reason)}</div>
+                        <div class="skipped-item-actions">
+                            <button class="btn btn-secondary btn-xs" onclick="forceRetryJob('${job.id}')">Force Transcode</button>
+                            <button class="btn btn-secondary btn-xs" onclick="showPresetPicker('${job.id}')">Try Different Preset</button>
+                            <button class="btn btn-secondary btn-xs" onclick="removeJob('${job.id}')">Remove</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function toggleFailedSection() {
+            const list = document.getElementById('failed-list');
+            const toggle = document.getElementById('failed-toggle');
+            const isExpanded = list.classList.contains('expanded');
+
+            if (isExpanded) {
+                list.classList.remove('expanded');
+                toggle.classList.remove('expanded');
+            } else {
+                list.classList.add('expanded');
+                toggle.classList.add('expanded');
+            }
+        }
+
+        function updateFailedSection(failedJobs) {
+            const section = document.getElementById('failed-section');
+            const countEl = document.getElementById('failed-count');
+            const listEl = document.getElementById('failed-list');
+
+            if (!failedJobs || failedJobs.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = 'block';
+            countEl.textContent = failedJobs.length;
+
+            // Sort by completed_at (newest first)
+            const sortedJobs = failedJobs
+                .sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at))
+                .slice(0, 50);
+
+            listEl.innerHTML = sortedJobs.map(job => {
+                const filename = job.input_path.split('/').pop();
+                const safeFilename = escapeHtml(filename);
+                const error = job.error || 'Unknown error';
+                return `
+                    <div class="failed-item" data-job-id="${job.id}">
+                        <div class="failed-item-header">
+                            <span class="failed-item-name" title="${escapeHtml(job.input_path)}">${safeFilename}</span>
+                        </div>
+                        <div class="failed-item-error">${escapeHtml(error)}</div>
+                        <div class="failed-item-actions">
+                            <button class="btn btn-secondary btn-xs" onclick="retryJob('${job.id}')">Retry</button>
+                            <button class="btn btn-secondary btn-xs" onclick="removeJob('${job.id}')">Remove</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function forceRetryJob(id) {
+            try {
+                const response = await fetch(`/api/jobs/${id}/force`, { method: 'POST' });
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to force retry');
+                }
+                // SSE will update the UI
+            } catch (error) {
+                console.error('Force retry failed:', error);
+                alert('Force retry failed: ' + error.message);
+            }
+        }
+
+        function showPresetPicker(jobId) {
+            // Create a simple preset selection modal
+            const presets = window.availablePresets || [];
+            if (presets.length === 0) {
+                alert('No presets available. Please configure presets in settings.');
+                return;
+            }
+
+            const options = presets.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+            const modal = document.createElement('div');
+            modal.className = 'settings-overlay';
+            modal.style.display = 'flex';
+            modal.innerHTML = `
+                <div class="settings-panel" style="max-width: 400px;" onclick="event.stopPropagation()">
+                    <div class="settings-header">
+                        <span class="settings-title">Select Preset</span>
+                        <button class="settings-close" onclick="this.closest('.settings-overlay').remove()">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                <line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="settings-content" style="padding: 16px;">
+                        <select id="preset-picker-select" class="setting-select" style="width: 100%; margin-bottom: 16px;">
+                            ${options}
+                        </select>
+                        <button class="btn btn-primary" style="width: 100%;" onclick="retryWithPreset('${jobId}', document.getElementById('preset-picker-select').value); this.closest('.settings-overlay').remove();">
+                            Retry with Selected Preset
+                        </button>
+                    </div>
+                </div>
+            `;
+            modal.onclick = () => modal.remove();
+            document.body.appendChild(modal);
+        }
+
+        async function retryWithPreset(id, presetId) {
+            try {
+                const response = await fetch(`/api/jobs/${id}/retry-preset`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ preset_id: presetId })
+                });
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to retry with preset');
+                }
+                // SSE will update the UI
+            } catch (error) {
+                console.error('Retry with preset failed:', error);
+                alert('Retry with preset failed: ' + error.message);
+            }
         }
 
         function updateActivePanel() {
@@ -4662,12 +5088,25 @@
                     handleJobStatusChange(data.job);
                 } else if (data.type === 'removed' && data.job) {
                     handleJobRemoved(data.job);
-                } else if ((data.type === 'started' || data.type === 'complete' || data.type === 'failed' || data.type === 'cancelled') && data.job) {
+                } else if ((data.type === 'started' || data.type === 'complete' || data.type === 'failed' || data.type === 'cancelled' || data.type === 'skipped' || data.type === 'no_gain') && data.job) {
                     // Performance: Update single job instead of full refresh
                     handleJobStatusChange(data.job);
                     if (data.type === 'complete' || data.type === 'failed') {
                         // Refresh file list to update metadata, but preserve selections
                         browse(currentPath, true, { updateHistory: false });
+                    }
+                    // Update sections for terminal states
+                    if (data.type === 'skipped' || data.type === 'no_gain') {
+                        const skippedJobs = cachedJobs.filter(j => j.status === 'skipped' || j.status === 'no_gain');
+                        updateSkippedSection(skippedJobs);
+                    }
+                    if (data.type === 'failed') {
+                        const failedJobs = cachedJobs.filter(j => j.status === 'failed');
+                        updateFailedSection(failedJobs);
+                    }
+                    if (data.type === 'complete') {
+                        const completedJobs = cachedJobs.filter(j => j.status === 'complete');
+                        updateCompletedSection(completedJobs);
                     }
                 } else {
                     // Fallback: debounced full refresh for unknown event types
@@ -4891,6 +5330,8 @@
         async function loadPresets() {
             try {
                 const presets = await fetch('/api/presets').then(r => r.json());
+                // Store presets globally for preset picker
+                window.availablePresets = presets;
                 const select = document.getElementById('preset-select');
                 select.innerHTML = presets.map(p =>
                     `<option value="${p.id}">${p.name}</option>`

@@ -392,11 +392,11 @@ func (w *Worker) processJob(job *Job) {
 		return
 	}
 
-	// Check if transcoded file is larger than original
-	if result.OutputSize >= job.InputSize {
-		// Delete the temp file and fail the job
+	// Check if transcoded file is larger than original (unless force transcode is enabled)
+	if result.OutputSize >= job.InputSize && !job.ForceTranscode {
+		// Delete the temp file and mark as no_gain
 		os.Remove(tempPath)
-		w.queue.FailJob(job.ID, fmt.Sprintf("Transcoded file (%s) is larger than original (%s). File skipped.",
+		w.queue.NoGainJob(job.ID, fmt.Sprintf("Transcoded file (%s) is larger than original (%s). File skipped.",
 			formatBytes(result.OutputSize), formatBytes(job.InputSize)))
 		return
 	}

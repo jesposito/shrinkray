@@ -800,3 +800,102 @@ func (h *Handler) RetryJob(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, newJob)
 }
+
+// ForceRetryJob handles POST /api/jobs/:id/force
+// This resets a skipped or no_gain job to pending with ForceTranscode enabled,
+// bypassing skip checks and size comparison.
+func (h *Handler) ForceRetryJob(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "job ID required")
+		return
+	}
+
+	job := h.queue.Get(id)
+	if job == nil {
+		writeError(w, http.StatusNotFound, "job not found")
+		return
+	}
+
+	if job.Status != jobs.StatusSkipped && job.Status != jobs.StatusNoGain {
+		writeError(w, http.StatusBadRequest, "can only force retry skipped or no_gain jobs")
+		return
+	}
+
+	if err := h.queue.ForceRetryJob(id); err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to force retry: %v", err))
+		return
+	}
+
+	// Get updated job
+	updatedJob := h.queue.Get(id)
+	writeJSON(w, http.StatusOK, updatedJob)
+}
+
+// RetryWithPresetRequest is the request body for RetryWithPreset
+type RetryWithPresetRequest struct {
+	PresetID string `json:"preset_id"`
+}
+
+// RetryWithPreset handles POST /api/jobs/:id/retry-preset
+// This creates a new job with a different preset for skipped or no_gain jobs.
+func (h *Handler) RetryWithPreset(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "job ID required")
+		return
+	}
+
+	var req RetryWithPresetRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.PresetID == "" {
+		writeError(w, http.StatusBadRequest, "preset_id required")
+		return
+	}
+
+	// Validate preset exists
+	preset := ffmpeg.GetPreset(req.PresetID)
+	if preset == nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown preset: %s", req.PresetID))
+		return
+	}
+
+	job := h.queue.Get(id)
+	if job == nil {
+		writeError(w, http.StatusNotFound, "job not found")
+		return
+	}
+
+	if job.Status != jobs.StatusSkipped && job.Status != jobs.StatusNoGain {
+		writeError(w, http.StatusBadRequest, "can only retry skipped or no_gain jobs with a different preset")
+		return
+	}
+
+	// Re-probe the file
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	probe, err := h.browser.ProbeFile(ctx, job.InputPath)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("failed to probe file: %v", err))
+		return
+	}
+
+	// Add new job with new preset
+	newJob, err := h.queue.Add(job.InputPath, req.PresetID, probe)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to create job: %v", err))
+		return
+	}
+
+	// Remove the old job
+	if _, err := h.queue.Remove(id); err != nil {
+		log.Printf("Failed to remove job %s after retry with preset: %v", id, err)
+	}
+
+	writeJSON(w, http.StatusOK, newJob)
+}
