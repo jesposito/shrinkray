@@ -18,7 +18,7 @@ func TestBuildPresetArgsDynamicBitrate(t *testing.T) {
 		Codec:   CodecHEVC,
 	}
 
-	_, outputArgs := BuildPresetArgs(preset, sourceBitrate, nil, "convert")
+	_, outputArgs := BuildPresetArgs(preset, sourceBitrate, nil, "convert", 8)
 
 	// Should contain -b:v with calculated bitrate
 	// Expected: 3481 * 0.35 = ~1218k
@@ -53,7 +53,7 @@ func TestBuildPresetArgsDynamicBitrateAV1(t *testing.T) {
 		Codec:   CodecAV1,
 	}
 
-	_, outputArgs := BuildPresetArgs(preset, sourceBitrate, nil, "convert")
+	_, outputArgs := BuildPresetArgs(preset, sourceBitrate, nil, "convert", 8)
 
 	// Expected: 3481 * 0.25 = ~870k
 	for i, arg := range outputArgs {
@@ -80,7 +80,7 @@ func TestBuildPresetArgsBitrateConstraints(t *testing.T) {
 		Codec:   CodecHEVC,
 	}
 
-	_, outputArgs := BuildPresetArgs(presetLow, lowBitrate, nil, "convert")
+	_, outputArgs := BuildPresetArgs(presetLow, lowBitrate, nil, "convert", 8)
 	for i, arg := range outputArgs {
 		if arg == "-b:v" && i+1 < len(outputArgs) {
 			bitrate := outputArgs[i+1]
@@ -101,7 +101,7 @@ func TestBuildPresetArgsBitrateConstraints(t *testing.T) {
 		Codec:   CodecHEVC,
 	}
 
-	_, outputArgs = BuildPresetArgs(presetHigh, highBitrate, nil, "convert")
+	_, outputArgs = BuildPresetArgs(presetHigh, highBitrate, nil, "convert", 8)
 	for i, arg := range outputArgs {
 		if arg == "-b:v" && i+1 < len(outputArgs) {
 			bitrate := outputArgs[i+1]
@@ -124,7 +124,7 @@ func TestBuildPresetArgsNonBitrateEncoder(t *testing.T) {
 		Codec:   CodecHEVC,
 	}
 
-	inputArgs, outputArgs := BuildPresetArgs(presetSoftware, sourceBitrate, nil, "convert")
+	inputArgs, outputArgs := BuildPresetArgs(presetSoftware, sourceBitrate, nil, "convert", 8)
 
 	// Software encoder should have probesize/analyzeduration but no hwaccel input args
 	// Expected: [-probesize 50M -analyzeduration 10M]
@@ -169,7 +169,7 @@ func TestBuildPresetArgsZeroBitrate(t *testing.T) {
 		Codec:   CodecHEVC,
 	}
 
-	_, outputArgs := BuildPresetArgs(presetVT, 0, nil, "convert")
+	_, outputArgs := BuildPresetArgs(presetVT, 0, nil, "convert", 8)
 
 	// Should still have -b:v but with raw modifier value
 	for i, arg := range outputArgs {
@@ -191,17 +191,17 @@ func TestBuildPresetArgsSubtitleHandling(t *testing.T) {
 		Codec:   CodecHEVC,
 	}
 
-	_, outputArgs := BuildPresetArgs(preset, 0, []string{"mov_text"}, "convert")
+	_, outputArgs := BuildPresetArgs(preset, 0, []string{"mov_text"}, "convert", 8)
 	if !containsArgPair(outputArgs, "-c:s", "srt") {
 		t.Errorf("expected -c:s srt when mov_text present and convert enabled, got %v", outputArgs)
 	}
 
-	_, outputArgs = BuildPresetArgs(preset, 0, []string{"mov_text"}, "drop")
+	_, outputArgs = BuildPresetArgs(preset, 0, []string{"mov_text"}, "drop", 8)
 	if !containsArg(outputArgs, "-sn") {
 		t.Errorf("expected -sn when mov_text present and drop enabled, got %v", outputArgs)
 	}
 
-	_, outputArgs = BuildPresetArgs(preset, 0, []string{"srt"}, "convert")
+	_, outputArgs = BuildPresetArgs(preset, 0, []string{"srt"}, "convert", 8)
 	if !containsArgPair(outputArgs, "-c:s", "copy") {
 		t.Errorf("expected -c:s copy when mov_text absent, got %v", outputArgs)
 	}
@@ -241,7 +241,7 @@ func TestBuildPresetArgsVAAPIAV1(t *testing.T) {
 		MaxHeight: 0, // No scaling
 	}
 
-	inputArgs, outputArgs := BuildPresetArgs(preset, 5000000, nil, "convert")
+	inputArgs, outputArgs := BuildPresetArgs(preset, 5000000, nil, "convert", 8)
 
 	// Verify input args contain VAAPI device and hardware acceleration
 	inputArgsStr := strings.Join(inputArgs, " ")
@@ -303,7 +303,7 @@ func TestBuildPresetArgsVAAPIAV1WithScaling(t *testing.T) {
 		MaxHeight: 1080, // Scale to 1080p
 	}
 
-	_, outputArgs := BuildPresetArgs(preset, 10000000, nil, "convert")
+	_, outputArgs := BuildPresetArgs(preset, 10000000, nil, "convert", 8)
 	outputArgsStr := strings.Join(outputArgs, " ")
 	t.Logf("VAAPI AV1 1080p output args: %v", outputArgs)
 
@@ -337,7 +337,7 @@ func TestBuildPresetArgsVAAPIHEVC(t *testing.T) {
 		MaxHeight: 0, // No scaling
 	}
 
-	_, outputArgs := BuildPresetArgs(preset, 5000000, nil, "convert")
+	_, outputArgs := BuildPresetArgs(preset, 5000000, nil, "convert", 8)
 	outputArgsStr := strings.Join(outputArgs, " ")
 	t.Logf("VAAPI HEVC output args: %v", outputArgs)
 
@@ -363,7 +363,7 @@ func TestBuildPresetArgsNonVAAPINoExtraFilter(t *testing.T) {
 		MaxHeight: 0, // No scaling
 	}
 
-	_, outputArgs := BuildPresetArgs(presetSoftware, 5000000, nil, "convert")
+	_, outputArgs := BuildPresetArgs(presetSoftware, 5000000, nil, "convert", 8)
 	outputArgsStr := strings.Join(outputArgs, " ")
 	t.Logf("Software HEVC output args: %v", outputArgs)
 
@@ -381,7 +381,7 @@ func TestBuildPresetArgsNonVAAPINoExtraFilter(t *testing.T) {
 		MaxHeight: 0, // No scaling
 	}
 
-	_, outputArgs = BuildPresetArgs(presetNVENC, 5000000, nil, "convert")
+	_, outputArgs = BuildPresetArgs(presetNVENC, 5000000, nil, "convert", 8)
 	outputArgsStr = strings.Join(outputArgs, " ")
 	t.Logf("NVENC HEVC output args: %v", outputArgs)
 
@@ -448,4 +448,69 @@ func TestBuildPresetArgsVAAPICPUFallback(t *testing.T) {
 
 	// This is tested implicitly by TestBuildPresetArgsVAAPIAV1 which verifies
 	// that VAAPI encoder gets the correct filter regardless of other conditions
+}
+
+// TestBuildPresetArgsVAAPI10Bit verifies that 10-bit content uses p010 format instead of nv12.
+// This prevents mid-encode failures (exit 218) when encoding HDR or 10-bit content.
+func TestBuildPresetArgsVAAPI10Bit(t *testing.T) {
+	preset := &Preset{
+		ID:        "compress-hevc",
+		Name:      "Compress (HEVC)",
+		Encoder:   HWAccelVAAPI,
+		Codec:     CodecHEVC,
+		MaxHeight: 0, // No scaling
+	}
+
+	// Test 10-bit content
+	_, outputArgs := BuildPresetArgs(preset, 5000000, nil, "convert", 10)
+	outputArgsStr := strings.Join(outputArgs, " ")
+	t.Logf("VAAPI HEVC 10-bit output args: %v", outputArgs)
+
+	// 10-bit content should use p010 format
+	if !containsArgPair(outputArgs, "-vf", "scale_vaapi=format=p010") {
+		t.Errorf("expected -vf scale_vaapi=format=p010 for 10-bit content, got: %s", outputArgsStr)
+	}
+
+	// Test 12-bit content (should also use p010)
+	_, outputArgs = BuildPresetArgs(preset, 5000000, nil, "convert", 12)
+	outputArgsStr = strings.Join(outputArgs, " ")
+	t.Logf("VAAPI HEVC 12-bit output args: %v", outputArgs)
+
+	if !containsArgPair(outputArgs, "-vf", "scale_vaapi=format=p010") {
+		t.Errorf("expected -vf scale_vaapi=format=p010 for 12-bit content, got: %s", outputArgsStr)
+	}
+}
+
+// TestBuildPresetArgsVAAPI10BitWithScaling verifies 10-bit content with scaling uses p010.
+func TestBuildPresetArgsVAAPI10BitWithScaling(t *testing.T) {
+	preset := &Preset{
+		ID:        "1080p",
+		Name:      "1080p",
+		Encoder:   HWAccelVAAPI,
+		Codec:     CodecHEVC,
+		MaxHeight: 1080, // Scale to 1080p
+	}
+
+	// Test 10-bit content with scaling
+	_, outputArgs := BuildPresetArgs(preset, 10000000, nil, "convert", 10)
+	outputArgsStr := strings.Join(outputArgs, " ")
+	t.Logf("VAAPI HEVC 10-bit 1080p output args: %v", outputArgs)
+
+	// Should have scale_vaapi with 1080 height AND p010 format
+	foundCorrectFilter := false
+	for i, arg := range outputArgs {
+		if arg == "-vf" && i+1 < len(outputArgs) {
+			filter := outputArgs[i+1]
+			if strings.Contains(filter, "scale_vaapi") &&
+				strings.Contains(filter, "1080") &&
+				strings.Contains(filter, "format=p010") {
+				foundCorrectFilter = true
+				t.Logf("Found correct 10-bit VAAPI scale filter: %s", filter)
+			}
+		}
+	}
+
+	if !foundCorrectFilter {
+		t.Errorf("expected scale_vaapi filter with 1080 and format=p010, got: %s", outputArgsStr)
+	}
 }

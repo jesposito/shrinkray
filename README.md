@@ -59,11 +59,50 @@ Automatically detected and used when available:
 | Platform | Encoder |
 |----------|---------|
 | Intel | Quick Sync (QSV) |
+| Intel Arc | VAAPI |
 | NVIDIA | NVENC |
 | AMD (Linux) | VAAPI |
 | macOS | VideoToolbox |
 
 Falls back to software encoding if no hardware is available.
+
+### Intel Arc GPU Setup (Docker/Unraid)
+
+For Intel Arc A380, A770, B580 and similar GPUs:
+
+```bash
+docker run -d \
+  --name shrinkray \
+  --device /dev/dri:/dev/dri \
+  --group-add render \
+  -e LIBVA_DRIVER_NAME=iHD \
+  -e PUID=99 \
+  -e PGID=100 \
+  -p 8080:8080 \
+  -v /path/to/config:/config \
+  -v /path/to/media:/media \
+  ghcr.io/jesposito/shrinkray:latest
+```
+
+Key settings:
+- `--device /dev/dri:/dev/dri` - Pass GPU device to container
+- `--group-add render` - Add render group permissions (may need GID like `105`)
+- `-e LIBVA_DRIVER_NAME=iHD` - Intel Arc requires the iHD driver
+
+**Verify GPU access:**
+```bash
+docker exec -it shrinkray vainfo
+```
+
+### Troubleshooting VAAPI
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| Exit code 218 mid-encode | 10-bit/HDR format mismatch | Update to latest version (auto-detects bit depth) |
+| "auto_scale_0" filter error | Missing VAAPI filter chain | Update to latest version (fixed) |
+| "Cannot open DRM render node" | No GPU access | Add `--device /dev/dri:/dev/dri` |
+| "vaInitialize failed" | Wrong driver | Set `LIBVA_DRIVER_NAME=iHD` for Intel Arc |
+| "Permission denied" | Render group missing | Add `--group-add render` or GID |
 
 ## Settings
 

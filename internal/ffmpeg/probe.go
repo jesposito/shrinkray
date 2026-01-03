@@ -23,8 +23,11 @@ type ProbeResult struct {
 	Height         int           `json:"height"`
 	Bitrate        int64         `json:"bitrate"` // bits per second
 	FrameRate      float64       `json:"frame_rate"`
-	IsHEVC         bool          `json:"is_hevc"` // true if already x265/HEVC
-	IsAV1          bool          `json:"is_av1"`  // true if already AV1
+	IsHEVC         bool          `json:"is_hevc"`    // true if already x265/HEVC
+	IsAV1          bool          `json:"is_av1"`     // true if already AV1
+	PixFmt         string        `json:"pix_fmt"`    // pixel format (e.g., yuv420p, yuv420p10le)
+	BitDepth       int           `json:"bit_depth"`  // color bit depth (8, 10, 12)
+	ColorRange     string        `json:"color_range"` // tv (limited) or pc (full)
 	Streams        []ProbeStream `json:"streams,omitempty"`
 }
 
@@ -52,14 +55,17 @@ type ffprobeFormat struct {
 }
 
 type ffprobeStream struct {
-	CodecType    string            `json:"codec_type"`
-	CodecName    string            `json:"codec_name"`
-	Width        int               `json:"width"`
-	Height       int               `json:"height"`
-	RFrameRate   string            `json:"r_frame_rate"`
-	AvgFrameRate string            `json:"avg_frame_rate"`
-	Duration     string            `json:"duration"`
-	Tags         map[string]string `json:"tags"`
+	CodecType        string            `json:"codec_type"`
+	CodecName        string            `json:"codec_name"`
+	Width            int               `json:"width"`
+	Height           int               `json:"height"`
+	PixFmt           string            `json:"pix_fmt"`
+	BitsPerRawSample string            `json:"bits_per_raw_sample"`
+	ColorRange       string            `json:"color_range"`
+	RFrameRate       string            `json:"r_frame_rate"`
+	AvgFrameRate     string            `json:"avg_frame_rate"`
+	Duration         string            `json:"duration"`
+	Tags             map[string]string `json:"tags"`
 }
 
 // Prober wraps ffprobe functionality
@@ -151,6 +157,9 @@ func (p *Prober) Probe(ctx context.Context, path string) (*ProbeResult, error) {
 				result.IsHEVC = isHEVCCodec(stream.CodecName)
 				result.IsAV1 = isAV1Codec(stream.CodecName)
 				result.FrameRate = probeStream.FrameRate
+				result.PixFmt = stream.PixFmt
+				result.ColorRange = stream.ColorRange
+				result.BitDepth = detectBitDepth(stream.PixFmt, stream.BitsPerRawSample)
 			}
 			if streamDuration, ok := parseDurationValue(stream.Duration); ok && streamDuration > maxVideoDuration {
 				maxVideoDuration = streamDuration
@@ -190,6 +199,40 @@ func isHEVCCodec(codec string) bool {
 func isAV1Codec(codec string) bool {
 	codec = strings.ToLower(codec)
 	return codec == "av1" || codec == "libaom-av1" || codec == "libsvtav1"
+}
+
+// detectBitDepth determines the color bit depth from pixel format and bits_per_raw_sample.
+// Returns 8, 10, or 12 (defaults to 8 if unknown).
+func detectBitDepth(pixFmt, bitsPerRawSample string) int {
+	// First try explicit bits_per_raw_sample
+	if bitsPerRawSample != "" {
+		if bits, err := strconv.Atoi(bitsPerRawSample); err == nil && bits > 0 {
+			return bits
+		}
+	}
+
+	// Infer from pixel format name
+	pixFmt = strings.ToLower(pixFmt)
+
+	// 12-bit formats
+	if strings.Contains(pixFmt, "12le") || strings.Contains(pixFmt, "12be") ||
+		strings.HasSuffix(pixFmt, "p12") {
+		return 12
+	}
+
+	// 10-bit formats (common: yuv420p10le, p010, p010le)
+	if strings.Contains(pixFmt, "10le") || strings.Contains(pixFmt, "10be") ||
+		strings.HasSuffix(pixFmt, "p10") || pixFmt == "p010" || pixFmt == "p010le" {
+		return 10
+	}
+
+	// Default to 8-bit
+	return 8
+}
+
+// Is10Bit returns true if the probe result indicates 10-bit or higher content
+func (p *ProbeResult) Is10Bit() bool {
+	return p.BitDepth >= 10
 }
 
 // parseFrameRate parses a frame rate string like "30000/1001" or "30/1"

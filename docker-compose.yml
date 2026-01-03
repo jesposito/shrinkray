@@ -13,7 +13,47 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=America/Chicago
+      # Intel Arc VAAPI settings (uncomment for Intel Arc GPUs)
+      # - LIBVA_DRIVER_NAME=iHD
+    # GPU passthrough for hardware transcoding (Intel/AMD VAAPI)
+    # Uncomment the devices section below for GPU access
+    # devices:
+    #   - /dev/dri:/dev/dri
+    # group_add:
+    #   - "render"  # May need to use GID instead, e.g., "105" or "44"
     restart: unless-stopped
 
 # For local development/testing with the testdata directory:
 # docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+# =============================================================================
+# GPU PASSTHROUGH CONFIGURATION
+# =============================================================================
+# For Intel Arc A380 or other Intel/AMD GPUs with VAAPI support:
+#
+# 1. Uncomment the 'devices' and 'group_add' sections above
+#
+# 2. For Intel Arc specifically, ensure LIBVA_DRIVER_NAME=iHD is set
+#
+# 3. Find your render group GID on the host:
+#    $ getent group render
+#    (typically 105 or 44)
+#
+# 4. If using Unraid, you may need to use the numeric GID:
+#    group_add:
+#      - "105"
+#
+# 5. To verify GPU access in the container:
+#    $ docker exec -it shrinkray vainfo
+#
+# Example for Intel Arc GPU:
+# ---
+# services:
+#   shrinkray:
+#     devices:
+#       - /dev/dri:/dev/dri
+#     group_add:
+#       - "render"
+#     environment:
+#       - LIBVA_DRIVER_NAME=iHD
+# =============================================================================

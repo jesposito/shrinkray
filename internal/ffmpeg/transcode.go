@@ -146,6 +146,78 @@ func scanCRLF(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	return 0, nil, nil
 }
 
+// IsVAAPIFormatError checks if the error is specifically a VAAPI pixel format
+// compatibility issue (exit code 218 or format mismatch errors).
+func (e *TranscodeError) IsVAAPIFormatError() bool {
+	stderr := strings.ToLower(e.Stderr)
+
+	// Exit code 218 often indicates VAAPI format issues
+	if e.ExitCode == 218 {
+		return true
+	}
+
+	// Known VAAPI format-related error patterns
+	formatPatterns := []string{
+		"impossible to convert between the formats",
+		"auto_scale",
+		"format not supported",
+		"vaapi surface format",
+		"hwupload",
+	}
+
+	for _, pattern := range formatPatterns {
+		if strings.Contains(stderr, pattern) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// DiagnoseVAAPIError provides detailed diagnostic information for VAAPI failures.
+// Returns a human-readable diagnosis and suggested fixes.
+func (e *TranscodeError) DiagnoseVAAPIError() (diagnosis string, suggestions []string) {
+	stderr := strings.ToLower(e.Stderr)
+
+	// Exit code 218 - usually format mismatch
+	if e.ExitCode == 218 {
+		diagnosis = "VAAPI encoding failed mid-stream (exit 218) - likely pixel format mismatch"
+		suggestions = append(suggestions, "10-bit content may require p010 format instead of nv12")
+		suggestions = append(suggestions, "Check if source is HDR/10-bit content")
+		return
+	}
+
+	// Filter graph errors
+	if strings.Contains(stderr, "impossible to convert between the formats") {
+		diagnosis = "VAAPI filter graph format incompatibility"
+		suggestions = append(suggestions, "Explicit scale_vaapi filter with format= is required")
+		suggestions = append(suggestions, "Frames must stay in VAAPI memory throughout the pipeline")
+		return
+	}
+
+	// Device access errors
+	if strings.Contains(stderr, "cannot open drm render node") ||
+		strings.Contains(stderr, "permission denied") {
+		diagnosis = "Cannot access VAAPI device"
+		suggestions = append(suggestions, "Ensure /dev/dri is passed to container: --device=/dev/dri")
+		suggestions = append(suggestions, "Add container user to 'render' group")
+		return
+	}
+
+	// Driver initialization errors
+	if strings.Contains(stderr, "vainitialize failed") ||
+		strings.Contains(stderr, "failed to initialise vaapi") {
+		diagnosis = "VAAPI driver initialization failed"
+		suggestions = append(suggestions, "Install intel-media-driver for Intel Arc GPUs")
+		suggestions = append(suggestions, "Set LIBVA_DRIVER_NAME=iHD for Intel Arc")
+		return
+	}
+
+	diagnosis = "Unknown VAAPI error"
+	suggestions = append(suggestions, "Check ffmpeg stderr for details")
+	return
+}
+
 // IsHardwareEncoderFailure checks if the error indicates a hardware encoder failure
 // that might succeed with a software encoder retry. Only returns true for errors
 // that are specifically related to hardware encoding initialization or execution,
@@ -291,6 +363,7 @@ func NewTranscoder(ffmpegPath string) *Transcoder {
 // Transcode transcodes a video file using the given preset
 // It sends progress updates to the progress channel and returns the result
 // sourceBitrate is the source video bitrate in bits/second (for dynamic bitrate calculation)
+// bitDepth is the source video bit depth (8, 10, 12) - used for VAAPI format selection
 func (t *Transcoder) Transcode(
 	ctx context.Context,
 	inputPath string,
@@ -300,6 +373,7 @@ func (t *Transcoder) Transcode(
 	sourceBitrate int64,
 	subtitleCodecs []string,
 	subtitleHandling string,
+	bitDepth int,
 	progressCh chan<- Progress,
 ) (*TranscodeResult, error) {
 	startTime := time.Now()
@@ -313,7 +387,8 @@ func (t *Transcoder) Transcode(
 
 	// Build preset args with source bitrate for dynamic calculation
 	// inputArgs go before -i (hwaccel), outputArgs go after
-	inputArgs, outputArgs := BuildPresetArgs(preset, sourceBitrate, subtitleCodecs, subtitleHandling)
+	// bitDepth determines pixel format: nv12 for 8-bit, p010 for 10-bit+
+	inputArgs, outputArgs := BuildPresetArgs(preset, sourceBitrate, subtitleCodecs, subtitleHandling, bitDepth)
 
 	// Build ffmpeg command
 	// Structure: ffmpeg [inputArgs] -i input [outputArgs] output

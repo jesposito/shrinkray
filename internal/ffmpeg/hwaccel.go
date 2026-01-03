@@ -468,3 +468,129 @@ func copyEncoders(src map[EncoderKey]*HWEncoder) map[EncoderKey]*HWEncoder {
 	}
 	return dst
 }
+
+// VAAAPIHealthCheck contains diagnostic information about VAAPI availability
+type VAAAPIHealthCheck struct {
+	Available     bool     `json:"available"`
+	DevicePath    string   `json:"device_path,omitempty"`
+	Driver        string   `json:"driver,omitempty"`
+	RenderDevices []string `json:"render_devices,omitempty"`
+	Errors        []string `json:"errors,omitempty"`
+	Warnings      []string `json:"warnings,omitempty"`
+}
+
+// CheckVAAPIHealth performs a comprehensive VAAPI health check for diagnostics.
+// This is useful for troubleshooting Docker/container GPU passthrough issues.
+func CheckVAAPIHealth(ffmpegPath string) *VAAAPIHealthCheck {
+	result := &VAAAPIHealthCheck{
+		RenderDevices: []string{},
+		Errors:        []string{},
+		Warnings:      []string{},
+	}
+
+	// Check for /dev/dri directory
+	driPath := "/dev/dri"
+	entries, err := os.ReadDir(driPath)
+	if err != nil {
+		result.Errors = append(result.Errors, "Cannot access /dev/dri: "+err.Error())
+		result.Errors = append(result.Errors, "Hint: Ensure the container has access to GPU devices")
+		return result
+	}
+
+	// List all render devices
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), "renderD") {
+			devicePath := filepath.Join(driPath, entry.Name())
+			result.RenderDevices = append(result.RenderDevices, devicePath)
+
+			// Check permissions
+			info, err := os.Stat(devicePath)
+			if err != nil {
+				result.Errors = append(result.Errors, "Cannot stat "+devicePath+": "+err.Error())
+				continue
+			}
+
+			mode := info.Mode()
+			if mode&0006 == 0 {
+				result.Warnings = append(result.Warnings, devicePath+" is not world-readable - ensure container user has access")
+			}
+		}
+	}
+
+	if len(result.RenderDevices) == 0 {
+		result.Errors = append(result.Errors, "No render devices found in /dev/dri")
+		result.Errors = append(result.Errors, "Hint: Add --device=/dev/dri to Docker run command")
+		return result
+	}
+
+	// Sort devices for consistent ordering
+	sort.Strings(result.RenderDevices)
+	result.DevicePath = result.RenderDevices[0]
+
+	// Check LIBVA_DRIVER_NAME environment variable
+	driverName := os.Getenv("LIBVA_DRIVER_NAME")
+	if driverName != "" {
+		result.Driver = driverName
+	} else {
+		result.Warnings = append(result.Warnings, "LIBVA_DRIVER_NAME not set - will auto-detect driver")
+	}
+
+	// Try a VAAPI encode test
+	if ffmpegPath != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		args := []string{
+			"-vaapi_device", result.DevicePath,
+			"-f", "lavfi",
+			"-i", "color=c=black:s=256x256:d=0.1",
+			"-frames:v", "1",
+			"-vf", "format=nv12,hwupload",
+			"-c:v", "hevc_vaapi",
+			"-f", "null",
+			"-",
+		}
+
+		cmd := exec.CommandContext(ctx, ffmpegPath, args...)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			result.Errors = append(result.Errors, "VAAPI encode test failed: "+err.Error())
+			// Extract useful error info from output
+			outputStr := string(output)
+			if strings.Contains(outputStr, "vaInitialize failed") {
+				result.Errors = append(result.Errors, "Hint: VA-API initialization failed - check driver installation")
+			}
+			if strings.Contains(outputStr, "Permission denied") {
+				result.Errors = append(result.Errors, "Hint: Permission denied - add container to 'render' group")
+			}
+			if strings.Contains(outputStr, "No VA display found") {
+				result.Errors = append(result.Errors, "Hint: No VA display - ensure libva and driver are installed")
+			}
+		} else {
+			result.Available = true
+		}
+	}
+
+	return result
+}
+
+// LogVAAPIHealth logs VAAPI health check results for diagnostics
+func LogVAAPIHealth(health *VAAAPIHealthCheck) {
+	log.Println("[vaapi-health] VAAPI Health Check:")
+	log.Printf("[vaapi-health]   Available: %v", health.Available)
+	if health.DevicePath != "" {
+		log.Printf("[vaapi-health]   Device: %s", health.DevicePath)
+	}
+	if health.Driver != "" {
+		log.Printf("[vaapi-health]   Driver: %s", health.Driver)
+	}
+	if len(health.RenderDevices) > 0 {
+		log.Printf("[vaapi-health]   Render devices: %v", health.RenderDevices)
+	}
+	for _, warning := range health.Warnings {
+		log.Printf("[vaapi-health]   WARNING: %s", warning)
+	}
+	for _, err := range health.Errors {
+		log.Printf("[vaapi-health]   ERROR: %s", err)
+	}
+}

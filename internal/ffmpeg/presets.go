@@ -171,8 +171,9 @@ func hasVAAPIOutputFormat(hwaccelArgs []string) bool {
 
 // BuildPresetArgs builds FFmpeg arguments for a preset with the specified encoder
 // sourceBitrate is the source video bitrate in bits/second (used for dynamic bitrate calculation)
+// bitDepth is the source video bit depth (8, 10, 12) - used for VAAPI format selection
 // Returns (inputArgs, outputArgs) - inputArgs go before -i, outputArgs go after
-func BuildPresetArgs(preset *Preset, sourceBitrate int64, subtitleCodecs []string, subtitleHandling string) (inputArgs []string, outputArgs []string) {
+func BuildPresetArgs(preset *Preset, sourceBitrate int64, subtitleCodecs []string, subtitleHandling string, bitDepth int) (inputArgs []string, outputArgs []string) {
 	key := EncoderKey{preset.Encoder, preset.Codec}
 	config, ok := encoderConfigs[key]
 	if !ok {
@@ -214,17 +215,28 @@ func BuildPresetArgs(preset *Preset, sourceBitrate int64, subtitleCodecs []strin
 		// download to CPU. This check ensures correct filter chain selection.
 		framesOnGPU := hasVAAPIOutputFormat(config.hwaccelArgs)
 
+		// Select output pixel format based on source bit depth:
+		// - 8-bit content: nv12 (standard 8-bit YUV 4:2:0)
+		// - 10-bit content: p010 (10-bit YUV 4:2:0, required for HDR)
+		// Using wrong format causes mid-encode failures (exit 218) or quality loss.
+		vaapiFormat := "nv12"
+		swFormat := "nv12" // format filter for software frames before hwupload
+		if bitDepth >= 10 {
+			vaapiFormat = "p010"
+			swFormat = "p010le" // little-endian for hwupload compatibility
+		}
+
 		if preset.MaxHeight > 0 {
 			// Scaling needed
 			if framesOnGPU {
 				// HW decode → frames already on GPU → HW scale
 				outputArgs = append(outputArgs,
-					"-vf", fmt.Sprintf("scale_vaapi=w=-2:h='min(ih,%d)':format=nv12", preset.MaxHeight),
+					"-vf", fmt.Sprintf("scale_vaapi=w=-2:h='min(ih,%d)':format=%s", preset.MaxHeight, vaapiFormat),
 				)
 			} else {
 				// SW/CPU decode → upload to GPU → HW scale
 				outputArgs = append(outputArgs,
-					"-vf", fmt.Sprintf("format=nv12,hwupload,scale_vaapi=w=-2:h='min(ih,%d)':format=nv12", preset.MaxHeight),
+					"-vf", fmt.Sprintf("format=%s,hwupload,scale_vaapi=w=-2:h='min(ih,%d)':format=%s", swFormat, preset.MaxHeight, vaapiFormat),
 				)
 			}
 		} else {
@@ -232,12 +244,12 @@ func BuildPresetArgs(preset *Preset, sourceBitrate int64, subtitleCodecs []strin
 			if framesOnGPU {
 				// HW decode → ensure format compatibility for encoder
 				outputArgs = append(outputArgs,
-					"-vf", "scale_vaapi=format=nv12",
+					"-vf", fmt.Sprintf("scale_vaapi=format=%s", vaapiFormat),
 				)
 			} else {
 				// SW/CPU decode → upload and format for encoder
 				outputArgs = append(outputArgs,
-					"-vf", "format=nv12,hwupload,scale_vaapi=format=nv12",
+					"-vf", fmt.Sprintf("format=%s,hwupload,scale_vaapi=format=%s", swFormat, vaapiFormat),
 				)
 			}
 		}
