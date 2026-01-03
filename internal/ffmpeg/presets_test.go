@@ -543,15 +543,17 @@ func TestBuildPresetArgsVAAPIPreventReconfiguration(t *testing.T) {
 		MaxHeight: 0, // No scaling
 	}
 
-	_, outputArgs := BuildPresetArgs(preset, 5000000, nil, "convert", 8)
-	outputArgsStr := strings.Join(outputArgs, " ")
+	inputArgs, outputArgs := BuildPresetArgs(preset, 5000000, nil, "convert", 8)
+	inputArgsStr := strings.Join(inputArgs, " ")
+	t.Logf("VAAPI input args: %v", inputArgs)
 	t.Logf("VAAPI output args: %v", outputArgs)
 
-	// CRITICAL: Verify -reinit_filter 0 is present
+	// CRITICAL: Verify -reinit_filter 0 is in INPUT args (not output args!)
 	// This is the PRIMARY fix - it completely disables filter reinitialization
 	// when input parameters change mid-stream, preventing the auto_scale insertion
-	if !containsArgPair(outputArgs, "-reinit_filter", "0") {
-		t.Errorf("expected -reinit_filter 0 to prevent mid-stream reconfiguration, got: %s", outputArgsStr)
+	// Note: -reinit_filter is an input option, must go before -i
+	if !containsArgPair(inputArgs, "-reinit_filter", "0") {
+		t.Errorf("expected -reinit_filter 0 in INPUT args to prevent mid-stream reconfiguration, got: %s", inputArgsStr)
 	}
 
 	// Find the -vf argument

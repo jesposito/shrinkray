@@ -201,6 +201,15 @@ func BuildPresetArgs(preset *Preset, sourceBitrate int64, subtitleCodecs []strin
 		inputArgs = append(inputArgs, arg)
 	}
 
+	// VAAPI: Add -reinit_filter 0 to INPUT args to prevent mid-stream filter reconfiguration.
+	// This MUST be an input option (before -i), not an output option.
+	// When input color metadata changes (e.g., SEI messages updating color from untagged to bt709),
+	// FFmpeg reconfigures the filter graph and may insert auto_scale between VAAPI filters,
+	// causing "Impossible to convert between formats" error after 40+ minutes.
+	if preset.Encoder == HWAccelVAAPI {
+		inputArgs = append(inputArgs, "-reinit_filter", "0")
+	}
+
 	// Output args
 	outputArgs = []string{}
 
@@ -209,19 +218,7 @@ func BuildPresetArgs(preset *Preset, sourceBitrate int64, subtitleCodecs []strin
 	// format compatibility. Without this, FFmpeg auto-inserts software filters that
 	// fail with: "Impossible to convert between the formats supported by the filter
 	// 'Parsed_null_0' and the filter 'auto_scale_0'"
-	//
-	// CRITICAL: We must also prevent mid-stream filter graph reconfiguration. When input
-	// color metadata changes (e.g., SEI messages updating color from untagged to bt709),
-	// FFmpeg reconfigures the filter graph and may insert auto_scale between VAAPI filters,
-	// causing: "Reconfiguring filter graph because video parameters changed to vaapi(tv, bt709)"
-	// followed by "Impossible to convert between formats" error after 40+ minutes.
-	//
-	// We use -reinit_filter 0 to completely disable filter reinitialization on parameter
-	// changes. This is the only reliable fix - output color params on scale_vaapi only
-	// affect output, they don't prevent FFmpeg from detecting input changes.
 	if preset.Encoder == HWAccelVAAPI {
-		// Disable filter reinitialization to prevent mid-stream reconfiguration failures
-		outputArgs = append(outputArgs, "-reinit_filter", "0")
 		// Check if decode outputs frames directly to VAAPI GPU memory.
 		// QSV uses VAAPI decode but without -hwaccel_output_format, so frames
 		// download to CPU. This check ensures correct filter chain selection.
