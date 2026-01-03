@@ -3,7 +3,7 @@
 > **This is a community fork of [gwlsn/shrinkray](https://github.com/gwlsn/shrinkray).**
 >
 > The original project focuses on UI polish, scheduling, and quality controls.
-> This fork focuses on hardware encoding reliability auth.
+> This fork focuses on hardware encoding reliability and auth.
 >
 > **Choose the original if you want:** Scheduling, dark mode, quality/CRF sliders, infinite scroll UI
 >
