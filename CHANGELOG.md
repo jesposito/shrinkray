@@ -10,9 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 - VAAPI AV1/HEVC transcode failure with "Impossible to convert between the formats
   supported by the filter 'Parsed_null_0' and the filter 'auto_scale_0'" error.
-  Root cause: FFmpeg auto-inserted software scaling filters when using VAAPI hardware
-  decode, which cannot handle VAAPI memory surfaces. Fix adds explicit
-  `-vf scale_vaapi=format=nv12` filter to keep frames on GPU.
+  This is a common issue for Unraid users with Intel Arc (A380, A770, B580) or AMD
+  RDNA GPUs using VAAPI hardware encoding. Root cause: FFmpeg auto-inserted software
+  scaling filters when using VAAPI hardware decode, which cannot handle VAAPI memory
+  surfaces. Fix adds explicit `-vf scale_vaapi=format=nv12` filter to keep frames
+  on GPU and ensure proper NV12 colorspace conversion for Intel QuickSync/AMD hardware.
 - "Multiple -codec/-c/-acodec/-vcodec options specified for stream 0" warning when
   using VAAPI encoders. Changed stream mapping from `-map 0 -c:v copy -c:v:0 encoder`
   to explicit stream selectors (`-map 0:v:0 -map 0:v:1? -map 0:a? -map 0:s?`).
