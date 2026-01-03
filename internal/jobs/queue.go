@@ -175,7 +175,7 @@ func (q *Queue) Add(inputPath string, presetID string, probe *ffmpeg.ProbeResult
 
 	status := StatusPending
 	if skipReason != "" {
-		status = StatusFailed
+		status = StatusSkipped
 	}
 
 	job := &Job{
@@ -203,7 +203,7 @@ func (q *Queue) Add(inputPath string, presetID string, probe *ffmpeg.ProbeResult
 
 	// Broadcast appropriate event based on status
 	if skipReason != "" {
-		q.broadcast(JobEvent{Type: "failed", Job: job})
+		q.broadcast(JobEvent{Type: "skipped", Job: job})
 	} else {
 		q.broadcast(JobEvent{Type: "added", Job: job})
 	}
@@ -239,7 +239,7 @@ func (q *Queue) AddMultiple(probes []*ffmpeg.ProbeResult, presetID string) ([]*J
 
 		status := StatusPending
 		if skipReason != "" {
-			status = StatusFailed
+			status = StatusSkipped
 		}
 
 		job := &Job{
@@ -281,9 +281,9 @@ func (q *Queue) AddMultiple(probes []*ffmpeg.ProbeResult, presetID string) ([]*J
 		q.broadcast(JobEvent{Type: "batch_added", Jobs: addedJobs})
 	}
 
-	// Skipped jobs still get individual "failed" events for proper UI handling
+	// Skipped jobs get individual "skipped" events for proper UI handling
 	for _, job := range skippedJobs {
-		q.broadcast(JobEvent{Type: "failed", Job: job})
+		q.broadcast(JobEvent{Type: "skipped", Job: job})
 	}
 
 	return allJobs, nil
@@ -415,7 +415,7 @@ func (q *Queue) UpdateJobAfterProbe(id string, probe *ffmpeg.ProbeResult) error 
 	}
 
 	if skipReason != "" {
-		job.Status = StatusFailed
+		job.Status = StatusSkipped
 		job.Error = skipReason
 		job.CompletedAt = time.Now()
 	} else {
@@ -428,7 +428,7 @@ func (q *Queue) UpdateJobAfterProbe(id string, probe *ffmpeg.ProbeResult) error 
 
 	// Broadcast appropriate event
 	if skipReason != "" {
-		q.broadcast(JobEvent{Type: "failed", Job: job})
+		q.broadcast(JobEvent{Type: "skipped", Job: job})
 	} else {
 		// Use a "probed" event type so frontend can update job details
 		q.broadcast(JobEvent{Type: "probed", Job: job})
@@ -799,6 +799,87 @@ func (q *Queue) FailJobWithDetails(id string, errMsg string, details *FailJobDet
 	return nil
 }
 
+// SkipJob marks a job as skipped (file already in target format or meets criteria)
+func (q *Queue) SkipJob(id string, reason string) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	job, ok := q.jobs[id]
+	if !ok {
+		return fmt.Errorf("job not found: %s", id)
+	}
+
+	job.Status = StatusSkipped
+	job.Error = reason
+	job.CompletedAt = time.Now()
+	job.TempPath = ""
+
+	if err := q.save(); err != nil {
+		fmt.Printf("Warning: failed to persist queue: %v\n", err)
+	}
+
+	q.broadcast(JobEvent{Type: "skipped", Job: job})
+
+	return nil
+}
+
+// NoGainJob marks a job as no_gain (transcoded file was larger than original)
+func (q *Queue) NoGainJob(id string, reason string) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	job, ok := q.jobs[id]
+	if !ok {
+		return fmt.Errorf("job not found: %s", id)
+	}
+
+	job.Status = StatusNoGain
+	job.Error = reason
+	job.CompletedAt = time.Now()
+	job.TempPath = ""
+
+	if err := q.save(); err != nil {
+		fmt.Printf("Warning: failed to persist queue: %v\n", err)
+	}
+
+	q.broadcast(JobEvent{Type: "no_gain", Job: job})
+
+	return nil
+}
+
+// ForceRetryJob resets a skipped or no_gain job to pending with ForceTranscode enabled.
+// This bypasses skip checks and size comparison on retry.
+func (q *Queue) ForceRetryJob(id string) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	job, ok := q.jobs[id]
+	if !ok {
+		return fmt.Errorf("job not found: %s", id)
+	}
+
+	if job.Status != StatusSkipped && job.Status != StatusNoGain {
+		return fmt.Errorf("can only force retry skipped or no_gain jobs, got: %s", job.Status)
+	}
+
+	// Reset job state
+	job.Status = StatusPending
+	job.Error = ""
+	job.Progress = 0
+	job.Speed = 0
+	job.ETA = ""
+	job.CompletedAt = time.Time{}
+	job.ForceTranscode = true
+
+	if err := q.save(); err != nil {
+		fmt.Printf("Warning: failed to persist queue: %v\n", err)
+	}
+
+	q.broadcast(JobEvent{Type: "added", Job: job})
+
+	return nil
+}
+
 // CancelJob cancels a job
 func (q *Queue) CancelJob(id string) error {
 	q.mu.Lock()
@@ -1086,6 +1167,8 @@ type Stats struct {
 	Complete     int   `json:"complete"`
 	Failed       int   `json:"failed"`
 	Cancelled    int   `json:"cancelled"`
+	Skipped      int   `json:"skipped"`
+	NoGain       int   `json:"no_gain"`
 	Total        int   `json:"total"`
 	TotalSaved   int64 `json:"total_saved"` // Total bytes saved by completed jobs
 }
@@ -1110,6 +1193,10 @@ func (q *Queue) Stats() Stats {
 			stats.Failed++
 		case StatusCancelled:
 			stats.Cancelled++
+		case StatusSkipped:
+			stats.Skipped++
+		case StatusNoGain:
+			stats.NoGain++
 		}
 	}
 	stats.TotalSaved = q.totalSaved
