@@ -4440,8 +4440,6 @@
             }
             const elapsed = formatElapsed(cachedJob || jobData);
 
-            updateCachedJobProgress(jobData.id, jobData.progress, jobData.speed, jobData.eta);
-
             // Update active panel - find the specific job item by ID
             const nowProcessingContent = document.getElementById('now-processing-content');
             const safeId = escapeCssSelector(jobData.id);
