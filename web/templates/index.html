@@ -770,7 +770,7 @@
 
         .queue-panel-content .queue-list {
             flex: 0 0 auto;
-            max-height: 60vh;
+            max-height: 40vh;
         }
 
         /* Active Jobs Panel - Separate box above queue */
@@ -1741,11 +1741,11 @@
         .completed-toggle {
             color: var(--text-tertiary);
             transition: transform var(--transition-fast);
-            transform: rotate(180deg);
+            transform: rotate(0deg);
         }
 
         .completed-toggle.expanded {
-            transform: rotate(0deg);
+            transform: rotate(180deg);
         }
 
         .completed-list {
@@ -1755,7 +1755,7 @@
         }
 
         .completed-list.expanded {
-            max-height: 300px;
+            max-height: 250px;
             overflow-y: auto;
         }
 
@@ -1846,11 +1846,11 @@
         .skipped-toggle {
             color: var(--text-tertiary);
             transition: transform var(--transition-fast);
-            transform: rotate(180deg);
+            transform: rotate(0deg);
         }
 
         .skipped-toggle.expanded {
-            transform: rotate(0deg);
+            transform: rotate(180deg);
         }
 
         .skipped-list {
@@ -1860,7 +1860,7 @@
         }
 
         .skipped-list.expanded {
-            max-height: 400px;
+            max-height: 250px;
             overflow-y: auto;
         }
 
@@ -1966,11 +1966,11 @@
         .failed-toggle {
             color: var(--text-tertiary);
             transition: transform var(--transition-fast);
-            transform: rotate(180deg);
+            transform: rotate(0deg);
         }
 
         .failed-toggle.expanded {
-            transform: rotate(0deg);
+            transform: rotate(180deg);
         }
 
         .failed-list {
@@ -1980,7 +1980,7 @@
         }
 
         .failed-list.expanded {
-            max-height: 400px;
+            max-height: 250px;
             overflow-y: auto;
         }
 
@@ -2334,18 +2334,18 @@
                         </button>
                     </div>
                     <div class="panel-body queue-panel-content" id="queue-panel-content">
-                        <div class="queue-list" id="queue-list">
-                            <div class="queue-empty">
-                                <div class="queue-empty-icon">
-                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.3">
-                                        <rect x="3" y="3" width="18" height="18" rx="2"/>
-                                        <path d="M3 9h18"/>
-                                        <path d="M9 21V9"/>
-                                    </svg>
+                        <!-- Completed Jobs Section (at top) -->
+                        <div class="completed-section" id="completed-section" style="display: none;">
+                            <div class="completed-header" role="button" tabindex="0" aria-expanded="false" aria-controls="completed-list" onclick="toggleCompletedSection()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleCompletedSection()}">
+                                <div class="completed-title">
+                                    <span>Recently Completed</span>
+                                    <span class="completed-count" id="completed-count">0</span>
                                 </div>
-                                <div>No jobs in queue</div>
-                                <div style="font-size: 0.8125rem; margin-top: 4px; color: var(--text-tertiary)">Select files and start transcoding</div>
+                                <svg class="completed-toggle" id="completed-toggle" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
                             </div>
+                            <div class="completed-list" id="completed-list"></div>
                         </div>
                         <!-- Skipped Jobs Section -->
                         <div class="skipped-section" id="skipped-section" style="display: none;">
@@ -2373,18 +2373,19 @@
                             </div>
                             <div class="failed-list" id="failed-list"></div>
                         </div>
-                        <!-- Completed Jobs Section -->
-                        <div class="completed-section" id="completed-section" style="display: none;">
-                            <div class="completed-header" role="button" tabindex="0" aria-expanded="false" aria-controls="completed-list" onclick="toggleCompletedSection()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleCompletedSection()}">
-                                <div class="completed-title">
-                                    <span>Recently Completed</span>
-                                    <span class="completed-count" id="completed-count">0</span>
+                        <!-- Queue List -->
+                        <div class="queue-list" id="queue-list">
+                            <div class="queue-empty">
+                                <div class="queue-empty-icon">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.3">
+                                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                        <path d="M3 9h18"/>
+                                        <path d="M9 21V9"/>
+                                    </svg>
                                 </div>
-                                <svg class="completed-toggle" id="completed-toggle" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                    <polyline points="6 9 12 15 18 9"></polyline>
-                                </svg>
+                                <div>No jobs in queue</div>
+                                <div style="font-size: 0.8125rem; margin-top: 4px; color: var(--text-tertiary)">Select files and start transcoding</div>
                             </div>
-                            <div class="completed-list" id="completed-list"></div>
                         </div>
                         <div class="queue-footer">
                             <button class="btn btn-secondary btn-sm" onclick="clearQueue()" style="flex: 1">Clear Queue</button>
@@ -4446,11 +4447,24 @@
                 errorRawExpanded.delete(job.id);
             }
 
-            // If job completed, move it to the completed section
-            if (job.status === 'complete') {
+            // If job started running, remove it from queue (it shows in Active panel)
+            if (job.status === 'running') {
                 // Remove from main queue list
                 const safeId = escapeCssSelector(job.id);
-                const el = document.querySelector(`.job-item[data-job-id="${safeId}"]`);
+                const el = document.querySelector(`#queue-list .job-item[data-job-id="${safeId}"]`);
+                if (el) {
+                    el.remove();
+                }
+                // Remove from virtual scroll state if enabled
+                if (virtualScrollEnabled) {
+                    removeJobFromVirtualState(job.id);
+                }
+            }
+            // If job completed, move it to the completed section
+            else if (job.status === 'complete') {
+                // Remove from main queue list
+                const safeId = escapeCssSelector(job.id);
+                const el = document.querySelector(`#queue-list .job-item[data-job-id="${safeId}"]`);
                 if (el) {
                     el.remove();
                 }
@@ -4461,6 +4475,19 @@
                 // Update completed section
                 const completedJobs = cachedJobs.filter(j => j.status === 'complete');
                 updateCompletedSection(completedJobs);
+            }
+            // If job failed/skipped/no_gain, remove from queue (they have their own sections)
+            else if (job.status === 'failed' || job.status === 'skipped' || job.status === 'no_gain') {
+                // Remove from main queue list
+                const safeId = escapeCssSelector(job.id);
+                const el = document.querySelector(`#queue-list .job-item[data-job-id="${safeId}"]`);
+                if (el) {
+                    el.remove();
+                }
+                // Remove from virtual scroll state if enabled
+                if (virtualScrollEnabled) {
+                    removeJobFromVirtualState(job.id);
+                }
             } else if (virtualScrollEnabled) {
                 // Virtual scroll: only update if visible
                 updateJobInView(job);
