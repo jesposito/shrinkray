@@ -530,11 +530,11 @@ func TestBuildPresetArgsVAAPI10Bit(t *testing.T) {
 	}
 }
 
-// TestBuildPresetArgsVAAPIColorParamsPreventReconfiguration verifies that VAAPI filter
-// includes all color output parameters to prevent mid-stream filter graph reconfiguration.
+// TestBuildPresetArgsVAAPIPreventReconfiguration verifies that VAAPI encoder includes
+// all necessary flags to prevent mid-stream filter graph reconfiguration.
 // This test addresses the issue: "Reconfiguring filter graph because video parameters
 // changed to vaapi(tv, bt709)" followed by "Impossible to convert between formats".
-func TestBuildPresetArgsVAAPIColorParamsPreventReconfiguration(t *testing.T) {
+func TestBuildPresetArgsVAAPIPreventReconfiguration(t *testing.T) {
 	preset := &Preset{
 		ID:        "compress-av1",
 		Name:      "Compress (AV1)",
@@ -544,6 +544,15 @@ func TestBuildPresetArgsVAAPIColorParamsPreventReconfiguration(t *testing.T) {
 	}
 
 	_, outputArgs := BuildPresetArgs(preset, 5000000, nil, "convert", 8)
+	outputArgsStr := strings.Join(outputArgs, " ")
+	t.Logf("VAAPI output args: %v", outputArgs)
+
+	// CRITICAL: Verify -reinit_filter 0 is present
+	// This is the PRIMARY fix - it completely disables filter reinitialization
+	// when input parameters change mid-stream, preventing the auto_scale insertion
+	if !containsArgPair(outputArgs, "-reinit_filter", "0") {
+		t.Errorf("expected -reinit_filter 0 to prevent mid-stream reconfiguration, got: %s", outputArgsStr)
+	}
 
 	// Find the -vf argument
 	var filter string
@@ -560,7 +569,7 @@ func TestBuildPresetArgsVAAPIColorParamsPreventReconfiguration(t *testing.T) {
 
 	t.Logf("Filter: %s", filter)
 
-	// Verify all required color params are present to prevent reconfiguration
+	// Verify all required color params are present (secondary defense)
 	requiredParams := []string{
 		"scale_vaapi",
 		"format=nv12",
@@ -572,16 +581,8 @@ func TestBuildPresetArgsVAAPIColorParamsPreventReconfiguration(t *testing.T) {
 
 	for _, param := range requiredParams {
 		if !strings.Contains(filter, param) {
-			t.Errorf("filter missing required param %q to prevent reconfiguration: %s", param, filter)
+			t.Errorf("filter missing required param %q: %s", param, filter)
 		}
-	}
-
-	// Verify no auto_scale would be inserted (filter is fully explicit)
-	// The presence of all color params ensures FFmpeg won't reconfigure
-	if !strings.Contains(filter, "out_color_matrix") ||
-		!strings.Contains(filter, "out_color_primaries") ||
-		!strings.Contains(filter, "out_color_transfer") {
-		t.Error("filter must include all color output params (out_color_matrix, out_color_primaries, out_color_transfer) to prevent mid-stream reconfiguration")
 	}
 }
 
