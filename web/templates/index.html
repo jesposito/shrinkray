@@ -14,8 +14,8 @@
             --bg-secondary: #FFFFFF;
             --bg-tertiary: #F5F5F5;
             --text-primary: #1A1A1A;
-            --text-secondary: #6B6B6B;
-            --text-tertiary: #9A9A9A;
+            --text-secondary: #525252;
+            --text-tertiary: #737373;
             --accent: #2563EB;
             --accent-hover: #1D4ED8;
             --accent-light: #EFF6FF;
@@ -46,8 +46,8 @@
             --bg-secondary: #1A1A1A;
             --bg-tertiary: #252525;
             --text-primary: #F5F5F5;
-            --text-secondary: #A0A0A0;
-            --text-tertiary: #6B6B6B;
+            --text-secondary: #A3A3A3;
+            --text-tertiary: #787878;
             --accent: #3B82F6;
             --accent-hover: #60A5FA;
             --accent-light: #1E3A5F;
@@ -749,11 +749,6 @@
             min-height: 0;
         }
 
-        .queue-panel-content {
-            flex: 1;
-            min-height: 0;
-        }
-
         .panel-body {
             display: flex;
             flex-direction: column;
@@ -763,14 +758,19 @@
         .queue-panel-content {
             flex: 1;
             min-height: 0;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
         }
 
         .queue-list {
             overflow-y: auto;
+            flex-shrink: 0;
         }
 
         .queue-panel-content .queue-list {
-            flex: 1;
+            flex: 0 0 auto;
+            max-height: 40vh;
         }
 
         /* Active Jobs Panel - Separate box above queue */
@@ -1741,11 +1741,11 @@
         .completed-toggle {
             color: var(--text-tertiary);
             transition: transform var(--transition-fast);
-            transform: rotate(180deg);
+            transform: rotate(0deg);
         }
 
         .completed-toggle.expanded {
-            transform: rotate(0deg);
+            transform: rotate(180deg);
         }
 
         .completed-list {
@@ -1755,7 +1755,7 @@
         }
 
         .completed-list.expanded {
-            max-height: 300px;
+            max-height: 250px;
             overflow-y: auto;
         }
 
@@ -1846,11 +1846,11 @@
         .skipped-toggle {
             color: var(--text-tertiary);
             transition: transform var(--transition-fast);
-            transform: rotate(180deg);
+            transform: rotate(0deg);
         }
 
         .skipped-toggle.expanded {
-            transform: rotate(0deg);
+            transform: rotate(180deg);
         }
 
         .skipped-list {
@@ -1860,7 +1860,7 @@
         }
 
         .skipped-list.expanded {
-            max-height: 400px;
+            max-height: 250px;
             overflow-y: auto;
         }
 
@@ -1966,11 +1966,11 @@
         .failed-toggle {
             color: var(--text-tertiary);
             transition: transform var(--transition-fast);
-            transform: rotate(180deg);
+            transform: rotate(0deg);
         }
 
         .failed-toggle.expanded {
-            transform: rotate(0deg);
+            transform: rotate(180deg);
         }
 
         .failed-list {
@@ -1980,7 +1980,7 @@
         }
 
         .failed-list.expanded {
-            max-height: 400px;
+            max-height: 250px;
             overflow-y: auto;
         }
 
@@ -2042,9 +2042,126 @@
             min-height: 72px;
             box-sizing: border-box;
         }
+
+        /* Offline indicator banner */
+        .offline-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 10000;
+            background: #dc2626;
+            color: white;
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from { transform: translateY(-100%); }
+            to { transform: translateY(0); }
+        }
+
+        /* Queue count badge */
+        .queue-count-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--accent);
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 600;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 6px;
+            border-radius: 10px;
+            margin-left: 8px;
+        }
+
+        /* Screen reader only */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        /* Improved focus indicators */
+        :focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        button:focus-visible,
+        .btn:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.25);
+        }
+
+        /* Minimum touch target sizes (44x44px per WCAG) */
+        @media (pointer: coarse) {
+            .btn-xs {
+                min-height: 44px;
+                min-width: 44px;
+            }
+            .settings-close,
+            .file-item,
+            .job-item {
+                min-height: 44px;
+            }
+        }
+
+        /* Pause button styles */
+        .pause-btn {
+            padding: 6px 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .pause-btn.paused {
+            background: var(--accent);
+            color: white;
+        }
+
+        .pause-btn.paused:hover {
+            background: var(--accent-hover);
+        }
+
+        .pause-btn svg {
+            display: block;
+        }
     </style>
 </head>
 <body>
+    <!-- Offline indicator banner -->
+    <div class="offline-banner" id="offline-banner" style="display: none;" role="alert" aria-live="assertive">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <line x1="1" y1="1" x2="23" y2="23"></line>
+            <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path>
+            <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path>
+            <path d="M10.71 5.05A16 16 0 0 1 22.58 9"></path>
+            <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path>
+            <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+            <line x1="12" y1="20" x2="12.01" y2="20"></line>
+        </svg>
+        <span>Connection lost. Reconnecting...</span>
+    </div>
+
+    <!-- Screen reader announcements -->
+    <div id="sr-announcements" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
     <div class="app">
         <header class="header">
             <div class="header-left">
@@ -2203,7 +2320,7 @@
                                     <line x1="3" y1="12" x2="3.01" y2="12"/>
                                     <line x1="3" y1="18" x2="3.01" y2="18"/>
                                 </svg>
-                                Queue
+                                Queue <span class="queue-count-badge" id="queue-count-badge" style="display: none;"></span>
                             </span>
                             <span class="panel-toggle-actions">
                                 <label class="notify-label" id="notify-container" style="display: none" onclick="event.stopPropagation()">
@@ -2217,18 +2334,18 @@
                         </button>
                     </div>
                     <div class="panel-body queue-panel-content" id="queue-panel-content">
-                        <div class="queue-list" id="queue-list">
-                            <div class="queue-empty">
-                                <div class="queue-empty-icon">
-                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.3">
-                                        <rect x="3" y="3" width="18" height="18" rx="2"/>
-                                        <path d="M3 9h18"/>
-                                        <path d="M9 21V9"/>
-                                    </svg>
+                        <!-- Completed Jobs Section (at top) -->
+                        <div class="completed-section" id="completed-section" style="display: none;">
+                            <div class="completed-header" role="button" tabindex="0" aria-expanded="false" aria-controls="completed-list" onclick="toggleCompletedSection()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleCompletedSection()}">
+                                <div class="completed-title">
+                                    <span>Recently Completed</span>
+                                    <span class="completed-count" id="completed-count">0</span>
                                 </div>
-                                <div>No jobs in queue</div>
-                                <div style="font-size: 0.8125rem; margin-top: 4px; color: var(--text-tertiary)">Select files and start transcoding</div>
+                                <svg class="completed-toggle" id="completed-toggle" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
                             </div>
+                            <div class="completed-list" id="completed-list"></div>
                         </div>
                         <!-- Skipped Jobs Section -->
                         <div class="skipped-section" id="skipped-section" style="display: none;">
@@ -2256,18 +2373,19 @@
                             </div>
                             <div class="failed-list" id="failed-list"></div>
                         </div>
-                        <!-- Completed Jobs Section -->
-                        <div class="completed-section" id="completed-section" style="display: none;">
-                            <div class="completed-header" role="button" tabindex="0" aria-expanded="false" aria-controls="completed-list" onclick="toggleCompletedSection()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleCompletedSection()}">
-                                <div class="completed-title">
-                                    <span>Recently Completed</span>
-                                    <span class="completed-count" id="completed-count">0</span>
+                        <!-- Queue List -->
+                        <div class="queue-list" id="queue-list">
+                            <div class="queue-empty">
+                                <div class="queue-empty-icon">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.3">
+                                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                        <path d="M3 9h18"/>
+                                        <path d="M9 21V9"/>
+                                    </svg>
                                 </div>
-                                <svg class="completed-toggle" id="completed-toggle" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                    <polyline points="6 9 12 15 18 9"></polyline>
-                                </svg>
+                                <div>No jobs in queue</div>
+                                <div style="font-size: 0.8125rem; margin-top: 4px; color: var(--text-tertiary)">Select files and start transcoding</div>
                             </div>
-                            <div class="completed-list" id="completed-list"></div>
                         </div>
                         <div class="queue-footer">
                             <button class="btn btn-secondary btn-sm" onclick="clearQueue()" style="flex: 1">Clear Queue</button>
@@ -3939,6 +4057,54 @@
             }
         }
 
+        // Track paused job states
+        const pausedJobs = new Set();
+
+        async function togglePauseJob(id) {
+            const isPaused = pausedJobs.has(id);
+            const endpoint = isPaused ? 'resume' : 'pause';
+            try {
+                const resp = await fetch(`/api/jobs/${id}/${endpoint}`, { method: 'POST' });
+                if (resp.ok) {
+                    if (isPaused) {
+                        pausedJobs.delete(id);
+                        announceToSR('Job resumed');
+                    } else {
+                        pausedJobs.add(id);
+                        announceToSR('Job paused');
+                    }
+                    updatePauseButton(id);
+                } else {
+                    console.error(`Failed to ${endpoint} job:`, await resp.text());
+                }
+            } catch (err) {
+                console.error(`${endpoint} error:`, err);
+            }
+        }
+
+        function updatePauseButton(id) {
+            const btn = document.getElementById(`pause-btn-${escapeCssSelector(id)}`);
+            if (!btn) return;
+            const isPaused = pausedJobs.has(id);
+            btn.setAttribute('aria-label', isPaused ? 'Resume job' : 'Pause job');
+            btn.classList.toggle('paused', isPaused);
+            // Update icon: pause bars vs play triangle
+            if (isPaused) {
+                btn.innerHTML = `
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true">
+                        <polygon points="5 3 19 12 5 21"></polygon>
+                    </svg>
+                `;
+            } else {
+                btn.innerHTML = `
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true">
+                        <rect x="6" y="4" width="4" height="16"></rect>
+                        <rect x="14" y="4" width="4" height="16"></rect>
+                    </svg>
+                `;
+            }
+        }
+
         async function moveJob(id, direction) {
             try {
                 const resp = await fetch(`/api/jobs/${id}/reorder`, {
@@ -4179,6 +4345,14 @@
                                 <button class="btn btn-secondary btn-sm" onclick="moveJob('${safeId}', 'up')" aria-label="Move job up">↑</button>
                                 <button class="btn btn-secondary btn-sm" onclick="moveJob('${safeId}', 'down')" aria-label="Move job down">↓</button>
                             ` : ''}
+                            ${job.status === 'running' ? `
+                                <button class="btn btn-secondary btn-sm pause-btn" id="pause-btn-${safeId}" onclick="togglePauseJob('${safeId}')" aria-label="Pause/Resume job">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true">
+                                        <rect x="6" y="4" width="4" height="16"></rect>
+                                        <rect x="14" y="4" width="4" height="16"></rect>
+                                    </svg>
+                                </button>
+                            ` : ''}
                             <button class="btn btn-secondary btn-sm" onclick="cancelJob('${safeId}')">Cancel</button>
                         </div>
                     ` : ''}
@@ -4273,11 +4447,24 @@
                 errorRawExpanded.delete(job.id);
             }
 
-            // If job completed, move it to the completed section
-            if (job.status === 'complete') {
+            // If job started running, remove it from queue (it shows in Active panel)
+            if (job.status === 'running') {
                 // Remove from main queue list
                 const safeId = escapeCssSelector(job.id);
-                const el = document.querySelector(`.job-item[data-job-id="${safeId}"]`);
+                const el = document.querySelector(`#queue-list .job-item[data-job-id="${safeId}"]`);
+                if (el) {
+                    el.remove();
+                }
+                // Remove from virtual scroll state if enabled
+                if (virtualScrollEnabled) {
+                    removeJobFromVirtualState(job.id);
+                }
+            }
+            // If job completed, move it to the completed section
+            else if (job.status === 'complete') {
+                // Remove from main queue list
+                const safeId = escapeCssSelector(job.id);
+                const el = document.querySelector(`#queue-list .job-item[data-job-id="${safeId}"]`);
                 if (el) {
                     el.remove();
                 }
@@ -4288,6 +4475,19 @@
                 // Update completed section
                 const completedJobs = cachedJobs.filter(j => j.status === 'complete');
                 updateCompletedSection(completedJobs);
+            }
+            // If job failed/skipped/no_gain, remove from queue (they have their own sections)
+            else if (job.status === 'failed' || job.status === 'skipped' || job.status === 'no_gain') {
+                // Remove from main queue list
+                const safeId = escapeCssSelector(job.id);
+                const el = document.querySelector(`#queue-list .job-item[data-job-id="${safeId}"]`);
+                if (el) {
+                    el.remove();
+                }
+                // Remove from virtual scroll state if enabled
+                if (virtualScrollEnabled) {
+                    removeJobFromVirtualState(job.id);
+                }
             } else if (virtualScrollEnabled) {
                 // Virtual scroll: only update if visible
                 updateJobInView(job);
@@ -4369,7 +4569,14 @@
             const completedJobs = cachedJobs.filter(j => j.status === 'complete');
             const skippedJobs = cachedJobs.filter(j => j.status === 'skipped' || j.status === 'no_gain');
             const failedJobs = cachedJobs.filter(j => j.status === 'failed');
-            // Active jobs are pending, running, pending_probe, and cancelled (but not completed, skipped, failed, no_gain)
+            // Queue shows pending jobs (not running - those are in Active panel)
+            // Excludes: complete, skipped, no_gain, failed, running
+            const queueJobs = cachedJobs.filter(j =>
+                j.status === 'pending' ||
+                j.status === 'pending_probe' ||
+                j.status === 'cancelled'
+            );
+            // For virtual scroll we still track all non-terminal jobs
             const activeJobs = cachedJobs.filter(j =>
                 j.status !== 'complete' &&
                 j.status !== 'skipped' &&
@@ -4382,15 +4589,17 @@
             updateSkippedSection(skippedJobs);
             updateFailedSection(failedJobs);
 
-            // Update virtual scroll state (only for active jobs)
+            // Update virtual scroll state (only for queue jobs)
             if (virtualScrollEnabled) {
                 clearVirtualState();
-                for (const job of activeJobs) {
+                for (const job of queueJobs) {
                     addJobToVirtualState(job);
                 }
             }
 
-            if (activeJobs.length === 0) {
+            // Queue panel shows only pending/pending_probe/cancelled jobs
+            // Running jobs are shown in the Active panel instead
+            if (queueJobs.length === 0) {
                 container.innerHTML = `
                     <div class="queue-empty">
                         <div class="queue-empty-icon">
@@ -4414,8 +4623,8 @@
                 updateVisibleRange();
                 renderVirtualJobs();
             } else {
-                // Legacy: render all jobs (only active, not completed)
-                container.innerHTML = activeJobs.map(job => renderJobHtml(job)).join('');
+                // Legacy: render all queue jobs
+                container.innerHTML = queueJobs.map(job => renderJobHtml(job)).join('');
             }
             updateActivePanel();
         }
@@ -4429,6 +4638,10 @@
             document.getElementById('stat-running').textContent = stats.running;
             const saved = Math.max(0, stats.total_saved || 0);
             document.getElementById('stat-saved').textContent = formatBytes(saved);
+
+            // Update queue count badge (pending + running)
+            const queueCount = totalPending + (stats.running || 0);
+            updateQueueCountBadge(queueCount);
         }
 
         // ========================================
@@ -4707,11 +4920,12 @@
                 const safeFilename = escapeHtml(filename);
                 const error = job.error || 'Unknown error';
                 return `
-                    <div class="failed-item" data-job-id="${job.id}">
+                    <div class="failed-item job-item" data-job-id="${job.id}">
                         <div class="failed-item-header">
                             <span class="failed-item-name" title="${escapeHtml(job.input_path)}">${safeFilename}</span>
                         </div>
                         <div class="failed-item-error" title="${escapeHtml(error)}">${escapeHtml(error)}</div>
+                        ${renderErrorHelper(job)}
                         <div class="failed-item-actions">
                             <button class="btn btn-secondary btn-xs" onclick="retryJob('${job.id}')" aria-label="Retry this failed job">Retry</button>
                             <button class="btn btn-danger btn-xs" onclick="removeJob('${job.id}')" aria-label="Remove this job">Remove</button>
@@ -4859,6 +5073,12 @@
                             </div>
                             <div class="job-details">${detailsHtml}</div>
                             <div class="job-actions">
+                                <button class="btn btn-secondary btn-sm pause-btn" id="pause-btn-${safeId}" onclick="togglePauseJob('${safeId}')" aria-label="Pause/Resume job">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true">
+                                        <rect x="6" y="4" width="4" height="16"></rect>
+                                        <rect x="14" y="4" width="4" height="16"></rect>
+                                    </svg>
+                                </button>
                                 <button class="btn btn-secondary btn-sm" onclick="cancelJob('${safeId}')">Cancel</button>
                             </div>
                         </div>
@@ -5141,6 +5361,17 @@
                 } else if ((data.type === 'started' || data.type === 'complete' || data.type === 'failed' || data.type === 'cancelled' || data.type === 'skipped' || data.type === 'no_gain') && data.job) {
                     // Performance: Update single job instead of full refresh
                     handleJobStatusChange(data.job);
+
+                    // Screen reader announcements for important events
+                    const filename = data.job.input_path ? data.job.input_path.split('/').pop() : 'Job';
+                    if (data.type === 'complete') {
+                        announceToSR(`${filename} completed successfully`);
+                    } else if (data.type === 'failed') {
+                        announceToSR(`${filename} failed`);
+                    } else if (data.type === 'started') {
+                        announceToSR(`Started transcoding ${filename}`);
+                    }
+
                     if (data.type === 'complete' || data.type === 'failed') {
                         // Refresh file list to update metadata, but preserve selections
                         browse(currentPath, true, { updateHistory: false });
@@ -5164,9 +5395,37 @@
                 }
             };
 
+            eventSource.onopen = () => {
+                document.getElementById('offline-banner').style.display = 'none';
+            };
+
             eventSource.onerror = () => {
+                document.getElementById('offline-banner').style.display = 'flex';
                 setTimeout(connectSSE, 2000);
             };
+        }
+
+        // Announce messages to screen readers
+        function announceToSR(message) {
+            const el = document.getElementById('sr-announcements');
+            if (el) {
+                el.textContent = message;
+                // Clear after announcement
+                setTimeout(() => { el.textContent = ''; }, 1000);
+            }
+        }
+
+        // Update queue count badge
+        function updateQueueCountBadge(count) {
+            const badge = document.getElementById('queue-count-badge');
+            if (badge) {
+                if (count > 0) {
+                    badge.textContent = count;
+                    badge.style.display = 'inline-flex';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
         }
 
         // Settings

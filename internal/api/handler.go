@@ -438,6 +438,58 @@ func (h *Handler) CancelJob(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "cancelled"})
 }
 
+// PauseJob handles POST /api/jobs/:id/pause
+func (h *Handler) PauseJob(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "job ID required")
+		return
+	}
+
+	job := h.queue.Get(id)
+	if job == nil {
+		writeError(w, http.StatusNotFound, "job not found")
+		return
+	}
+
+	if job.Status != jobs.StatusRunning {
+		writeError(w, http.StatusConflict, "job is not running")
+		return
+	}
+
+	if h.workerPool.PauseJob(id) {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "paused"})
+	} else {
+		writeError(w, http.StatusConflict, "failed to pause job")
+	}
+}
+
+// ResumeJob handles POST /api/jobs/:id/resume
+func (h *Handler) ResumeJob(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "job ID required")
+		return
+	}
+
+	job := h.queue.Get(id)
+	if job == nil {
+		writeError(w, http.StatusNotFound, "job not found")
+		return
+	}
+
+	if job.Status != jobs.StatusRunning {
+		writeError(w, http.StatusConflict, "job is not running")
+		return
+	}
+
+	if h.workerPool.ResumeJob(id) {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "resumed"})
+	} else {
+		writeError(w, http.StatusConflict, "failed to resume job")
+	}
+}
+
 // ReorderJob handles POST /api/jobs/:id/reorder
 func (h *Handler) ReorderJob(w http.ResponseWriter, r *http.Request) {
 	type reorderJobRequest struct {

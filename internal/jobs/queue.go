@@ -26,6 +26,11 @@ type Queue struct {
 
 	// Rate limiting for hardware fallbacks to prevent queue explosion
 	fallbackTimes []time.Time // Timestamps of recent fallback creations
+
+	// Debounced save mechanism to reduce lock contention
+	saveMu    sync.Mutex
+	saveTimer *time.Timer
+	saveDirty bool
 }
 
 // NewQueue creates a new job queue, optionally loading from a persistence file
@@ -111,32 +116,48 @@ func (q *Queue) load() error {
 	return nil
 }
 
-// save writes the queue to disk
+// save writes the queue to disk (must be called with q.mu held)
 func (q *Queue) save() error {
 	if q.filePath == "" {
 		return nil
 	}
 
-	// Ensure directory exists
-	dir := filepath.Dir(q.filePath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
-	}
-
-	// Build ordered job list
+	// Capture data while holding the lock
 	jobs := make([]*Job, 0, len(q.jobs))
 	for _, id := range q.order {
 		if job, ok := q.jobs[id]; ok {
-			jobs = append(jobs, job)
+			// Deep copy job to avoid races
+			jobCopy := *job
+			jobs = append(jobs, &jobCopy)
 		}
 	}
 
 	totalSaved := q.totalSaved
+	orderCopy := make([]string, len(q.order))
+	copy(orderCopy, q.order)
+
+	processedCopy := make(map[string]time.Time, len(q.processedPaths))
+	for k, v := range q.processedPaths {
+		processedCopy[k] = v
+	}
+
 	pd := persistenceData{
 		Jobs:           jobs,
-		Order:          q.order,
-		ProcessedPaths: q.processedPaths,
+		Order:          orderCopy,
+		ProcessedPaths: processedCopy,
 		TotalSaved:     &totalSaved,
+	}
+
+	// Do the actual I/O (this is still blocking, but data is copied)
+	return q.writeToFile(pd)
+}
+
+// writeToFile performs the actual disk write
+func (q *Queue) writeToFile(pd persistenceData) error {
+	// Ensure directory exists
+	dir := filepath.Dir(q.filePath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
 	}
 
 	data, err := json.MarshalIndent(pd, "", "  ")
@@ -151,6 +172,73 @@ func (q *Queue) save() error {
 	}
 
 	return os.Rename(tmpPath, q.filePath)
+}
+
+// scheduleSave schedules a debounced save operation.
+// Multiple calls within the debounce window are coalesced into a single save.
+// This reduces lock contention by avoiding disk I/O while holding the queue lock.
+func (q *Queue) scheduleSave() {
+	q.saveMu.Lock()
+	defer q.saveMu.Unlock()
+
+	q.saveDirty = true
+
+	// If a timer is already running, let it handle the save
+	if q.saveTimer != nil {
+		return
+	}
+
+	// Schedule save after 100ms debounce window
+	q.saveTimer = time.AfterFunc(100*time.Millisecond, func() {
+		q.saveMu.Lock()
+		q.saveTimer = nil
+		isDirty := q.saveDirty
+		q.saveDirty = false
+		q.saveMu.Unlock()
+
+		if isDirty {
+			q.mu.RLock()
+			err := q.saveSnapshot()
+			q.mu.RUnlock()
+			if err != nil {
+				fmt.Printf("Warning: failed to persist queue: %v\n", err)
+			}
+		}
+	})
+}
+
+// saveSnapshot captures a snapshot and writes to disk (must be called with q.mu held for reading)
+func (q *Queue) saveSnapshot() error {
+	if q.filePath == "" {
+		return nil
+	}
+
+	// Capture data while holding the read lock
+	jobs := make([]*Job, 0, len(q.jobs))
+	for _, id := range q.order {
+		if job, ok := q.jobs[id]; ok {
+			jobCopy := *job
+			jobs = append(jobs, &jobCopy)
+		}
+	}
+
+	totalSaved := q.totalSaved
+	orderCopy := make([]string, len(q.order))
+	copy(orderCopy, q.order)
+
+	processedCopy := make(map[string]time.Time, len(q.processedPaths))
+	for k, v := range q.processedPaths {
+		processedCopy[k] = v
+	}
+
+	pd := persistenceData{
+		Jobs:           jobs,
+		Order:          orderCopy,
+		ProcessedPaths: processedCopy,
+		TotalSaved:     &totalSaved,
+	}
+
+	return q.writeToFile(pd)
 }
 
 // Add adds a new job to the queue
@@ -268,12 +356,10 @@ func (q *Queue) AddMultiple(probes []*ffmpeg.ProbeResult, presetID string) ([]*J
 		}
 	}
 
-	// Persist once after all jobs are added (not per-job)
-	if err := q.save(); err != nil {
-		fmt.Printf("Warning: failed to persist queue: %v\n", err)
-	}
-
 	q.mu.Unlock()
+
+	// Schedule debounced save (non-blocking, reduces lock contention)
+	q.scheduleSave()
 
 	// Broadcast events outside the lock to prevent SSE blocking queue operations
 	// Performance: send single batch event instead of N individual events
@@ -364,11 +450,10 @@ func (q *Queue) AddMultipleWithoutProbe(files []FileInfo, presetID string) []*Jo
 		jobs = append(jobs, job)
 	}
 
-	if err := q.save(); err != nil {
-		fmt.Printf("Warning: failed to persist queue: %v\n", err)
-	}
-
 	q.mu.Unlock()
+
+	// Schedule debounced save (non-blocking, reduces lock contention)
+	q.scheduleSave()
 
 	// Broadcast batch event
 	if len(jobs) > 0 {

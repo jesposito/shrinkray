@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 )
 
@@ -353,11 +355,63 @@ func (b *boundedBuffer) String() string {
 // Transcoder wraps ffmpeg transcoding functionality
 type Transcoder struct {
 	ffmpegPath string
+
+	// Process control for pause/resume
+	mu      sync.Mutex
+	process *os.Process
+	paused  bool
 }
 
 // NewTranscoder creates a new Transcoder with the given ffmpeg path
 func NewTranscoder(ffmpegPath string) *Transcoder {
 	return &Transcoder{ffmpegPath: ffmpegPath}
+}
+
+// Pause sends SIGSTOP to the ffmpeg process to pause transcoding.
+// Returns true if the process was paused, false if there's no process running.
+func (t *Transcoder) Pause() bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.process == nil || t.paused {
+		return false
+	}
+
+	if err := t.process.Signal(syscall.SIGSTOP); err != nil {
+		log.Printf("[transcode] Failed to pause process: %v", err)
+		return false
+	}
+
+	t.paused = true
+	log.Printf("[transcode] Process paused (PID %d)", t.process.Pid)
+	return true
+}
+
+// Resume sends SIGCONT to the ffmpeg process to resume transcoding.
+// Returns true if the process was resumed, false if there's no process paused.
+func (t *Transcoder) Resume() bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.process == nil || !t.paused {
+		return false
+	}
+
+	if err := t.process.Signal(syscall.SIGCONT); err != nil {
+		log.Printf("[transcode] Failed to resume process: %v", err)
+		return false
+	}
+
+	t.paused = false
+	log.Printf("[transcode] Process resumed (PID %d)", t.process.Pid)
+	return true
+}
+
+// IsPaused returns true if the transcoder is currently paused
+func (t *Transcoder) IsPaused() bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.paused
 }
 
 // Transcode transcodes a video file using the given preset
@@ -427,6 +481,20 @@ func (t *Transcoder) Transcode(
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start ffmpeg: %w", err)
 	}
+
+	// Store process reference for pause/resume
+	t.mu.Lock()
+	t.process = cmd.Process
+	t.paused = false
+	t.mu.Unlock()
+
+	// Ensure we clear the process reference when done
+	defer func() {
+		t.mu.Lock()
+		t.process = nil
+		t.paused = false
+		t.mu.Unlock()
+	}()
 
 	// Parse progress from stdout
 	go func() {
