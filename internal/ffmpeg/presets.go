@@ -151,10 +151,10 @@ var BasePresets = []struct {
 	Codec       Codec
 	MaxHeight   int
 }{
-	{"compress-hevc", "Smaller files (widely compatible)", "Excellent quality, works almost everywhere", CodecHEVC, 0},
-	{"compress-av1", "Smaller files (best quality)", "Smallest files, best quality per MB", CodecAV1, 0},
-	{"1080p", "Reduce resolution to 1080p", "Downscale to Full HD for big savings", CodecHEVC, 1080},
-	{"720p", "Reduce resolution to 720p", "Maximum compatibility, smallest files", CodecHEVC, 720},
+	{"compress-hevc", "Smaller files — HEVC", "Widely compatible, works almost everywhere", CodecHEVC, 0},
+	{"compress-av1", "Smaller files — AV1", "Best quality per MB, newer devices", CodecAV1, 0},
+	{"1080p", "Reduce to 1080p — HEVC", "Downscale to Full HD for big savings", CodecHEVC, 1080},
+	{"720p", "Reduce to 720p — HEVC", "Maximum compatibility, smallest files", CodecHEVC, 720},
 }
 
 // hasVAAPIOutputFormat checks if hwaccelArgs specify -hwaccel_output_format vaapi,

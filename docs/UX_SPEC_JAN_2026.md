@@ -17,10 +17,10 @@ Downscale to 720p
 ### New UI Labels (IDs unchanged)
 | Preset ID | New UI Label | Description |
 |-----------|--------------|-------------|
-| `compress-av1` | Smaller files (best quality) | Smallest files, best quality per MB |
-| `compress-hevc` | Smaller files (widely compatible) | Excellent quality, works everywhere |
-| `1080p` | Reduce resolution to 1080p | Downscale to Full HD |
-| `720p` | Reduce resolution to 720p | Maximum compatibility |
+| `compress-hevc` | Smaller files — HEVC | Widely compatible, works almost everywhere |
+| `compress-av1` | Smaller files — AV1 | Best quality per MB, newer devices |
+| `1080p` | Reduce to 1080p — HEVC | Downscale to Full HD for big savings |
+| `720p` | Reduce to 720p — HEVC | Maximum compatibility, smallest files |
 
 ### Implementation
 - **File**: `internal/ffmpeg/presets.go` (lines 154-157)
