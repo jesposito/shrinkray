@@ -93,6 +93,11 @@ type Config struct {
 	// HideProcessingTmp controls hiding shrinkray.tmp files from the UI
 	HideProcessingTmp bool `yaml:"hide_processing_tmp"`
 
+	// AllowSoftwareFallback controls whether GPU encode failures trigger automatic CPU retry.
+	// Default: false (GPU failures fail the job with a clear message).
+	// When enabled, Shrinkray will retry failed GPU encodes using CPU, which is slower but may succeed.
+	AllowSoftwareFallback bool `yaml:"allow_software_fallback"`
+
 	// Features contains feature flags for phased rollout of new functionality
 	Features FeatureFlags `yaml:"features"`
 

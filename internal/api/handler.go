@@ -623,9 +623,10 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		"ntfy_topic":          h.cfg.NtfyTopic,
 		"ntfy_token":          h.cfg.NtfyToken,
 		"ntfy_configured":     h.ntfy.IsConfigured(),
-		"notify_on_complete":  h.cfg.NotifyOnComplete,
-		"hide_processing_tmp": h.cfg.HideProcessingTmp,
-		"auth_enabled":        h.cfg.Auth.Enabled,
+		"notify_on_complete":      h.cfg.NotifyOnComplete,
+		"hide_processing_tmp":     h.cfg.HideProcessingTmp,
+		"allow_software_fallback": h.cfg.AllowSoftwareFallback,
+		"auth_enabled":            h.cfg.Auth.Enabled,
 		"auth_provider":       h.cfg.Auth.Provider,
 		// Feature flags for frontend
 		"features": map[string]bool{
@@ -648,8 +649,9 @@ type UpdateConfigRequest struct {
 	NtfyServer        *string `json:"ntfy_server,omitempty"`
 	NtfyTopic         *string `json:"ntfy_topic,omitempty"`
 	NtfyToken         *string `json:"ntfy_token,omitempty"`
-	NotifyOnComplete  *bool   `json:"notify_on_complete,omitempty"`
-	HideProcessingTmp *bool   `json:"hide_processing_tmp,omitempty"`
+	NotifyOnComplete      *bool `json:"notify_on_complete,omitempty"`
+	HideProcessingTmp     *bool `json:"hide_processing_tmp,omitempty"`
+	AllowSoftwareFallback *bool `json:"allow_software_fallback,omitempty"`
 }
 
 // UpdateConfig handles PUT /api/config
@@ -712,6 +714,9 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	if req.HideProcessingTmp != nil {
 		h.cfg.HideProcessingTmp = *req.HideProcessingTmp
 		h.browser.SetHideProcessingTmp(*req.HideProcessingTmp)
+	}
+	if req.AllowSoftwareFallback != nil {
+		h.cfg.AllowSoftwareFallback = *req.AllowSoftwareFallback
 	}
 
 	// Persist config to disk
@@ -800,6 +805,7 @@ func (h *Handler) ApplyConfig(newCfg *config.Config) {
 	h.cfg.NtfyToken = newCfg.NtfyToken
 	h.cfg.NotifyOnComplete = newCfg.NotifyOnComplete
 	h.cfg.HideProcessingTmp = newCfg.HideProcessingTmp
+	h.cfg.AllowSoftwareFallback = newCfg.AllowSoftwareFallback
 	h.cfg.Features = newCfg.Features
 
 	h.pushover.UserKey = newCfg.PushoverUserKey

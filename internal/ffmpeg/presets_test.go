@@ -738,3 +738,42 @@ func TestVAAPIIncompatiblePixFmt(t *testing.T) {
 		}
 	}
 }
+
+func TestGetHardwarePath(t *testing.T) {
+	tests := []struct {
+		encoder  HWAccel
+		pixFmt   string
+		expected string
+	}{
+		// VAAPI with compatible format = full GPU pipeline
+		{HWAccelVAAPI, "yuv420p", "vaapi→vaapi"},
+		{HWAccelVAAPI, "nv12", "vaapi→vaapi"},
+		{HWAccelVAAPI, "p010", "vaapi→vaapi"},
+
+		// VAAPI with incompatible format = CPU decode
+		{HWAccelVAAPI, "yuv444p", "cpu→vaapi"},
+		{HWAccelVAAPI, "yuv444p10le", "cpu→vaapi"},
+
+		// NVENC uses CUDA for decode
+		{HWAccelNVENC, "yuv420p", "cuda→nvenc"},
+		{HWAccelNVENC, "yuv444p", "cuda→nvenc"},
+
+		// QSV uses VAAPI for decode (on Linux)
+		{HWAccelQSV, "yuv420p", "vaapi→qsv"},
+
+		// VideoToolbox
+		{HWAccelVideoToolbox, "yuv420p", "videotoolbox→videotoolbox"},
+
+		// Software encoding
+		{HWAccelNone, "yuv420p", "cpu→cpu"},
+		{HWAccelNone, "yuv444p", "cpu→cpu"},
+	}
+
+	for _, tt := range tests {
+		result := GetHardwarePath(tt.encoder, tt.pixFmt)
+		if result != tt.expected {
+			t.Errorf("GetHardwarePath(%s, %s) = %s, expected %s",
+				tt.encoder, tt.pixFmt, result, tt.expected)
+		}
+	}
+}

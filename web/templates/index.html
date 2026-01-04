@@ -2581,6 +2581,18 @@
                     </div>
                 </div>
                 <div class="setting-group">
+                    <div class="setting-group-title">Transcoding</div>
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <div class="setting-name">Allow CPU encode fallback</div>
+                            <div class="setting-desc">Useful if a few files won't encode on GPU</div>
+                        </div>
+                        <div class="setting-control">
+                            <input type="checkbox" id="setting-allow-software-fallback" onchange="toggleAllowSoftwareFallback(this.checked)" style="width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer;">
+                        </div>
+                    </div>
+                </div>
+                <div class="setting-group">
                     <div class="setting-group-title">History</div>
                     <div class="setting-item">
                         <div class="setting-info">
@@ -4215,10 +4227,17 @@
             const presetId = job.preset_id || '';
             const hardwarePath = job.hardware_path || '';
             const isCpuDecode = hardwarePath.startsWith('cpu→');
+            const isSoftwareFallback = job.is_software_fallback || false;
 
             // Running jobs: describe what's happening
             if (job.status === 'running' || job.status === 'pending' || job.status === 'pending_probe') {
                 let message = '';
+
+                // Software fallback jobs get a special message
+                if (isSoftwareFallback) {
+                    message = 'Retrying with CPU encode';
+                    return message;
+                }
 
                 if (presetId === 'compress-av1') {
                     message = 'Compressing using AV1 for best quality and smallest size';
@@ -5792,6 +5811,7 @@
                 document.getElementById('setting-ntfy-token').value = config.ntfy_token || '';
 
                 document.getElementById('setting-hide-processing-tmp').checked = config.hide_processing_tmp || false;
+                document.getElementById('setting-allow-software-fallback').checked = config.allow_software_fallback || false;
 
                 // Show/hide notify checkbox based on whether any provider is configured
                 const notifyContainer = document.getElementById('notify-container');
@@ -5864,6 +5884,10 @@
             if (updated) {
                 browse(currentPath, false, { updateHistory: false });
             }
+        }
+
+        async function toggleAllowSoftwareFallback(enabled) {
+            await updateSetting('allow_software_fallback', enabled);
         }
 
         async function clearProcessedHistory() {

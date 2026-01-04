@@ -194,4 +194,52 @@ None of these conflict with existing functionality—all are additive changes.
 
 ---
 
+## 8. CPU Encode Fallback Setting
+
+### Overview
+
+A new setting controls whether GPU encode failures trigger automatic CPU retry.
+
+**Default: OFF** — GPU failures fail the job with guidance to check VAAPI setup.
+
+### UI Implementation
+
+**Location**: Settings panel → Transcoding section
+
+**Toggle Copy**:
+- **Name**: "Allow CPU encode fallback"
+- **Description**: "Useful if a few files won't encode on GPU"
+
+### Behavior
+
+| Setting | GPU Encode Fails | Result |
+|---------|------------------|--------|
+| OFF (default) | Job fails | Error message + guidance to enable setting |
+| ON | Job retries | Automatic CPU encode retry |
+
+### Rationale
+
+For Unraid + Intel Arc VAAPI users, GPU encodes should work. Failures usually indicate:
+- Missing render group permissions
+- Wrong VAAPI driver
+- Container misconfiguration
+
+Automatic fallback masks these problems. By defaulting OFF, users are guided to fix their setup rather than silently degrading to slow CPU encodes.
+
+### Implementation
+
+| File | Change |
+|------|--------|
+| `internal/config/config.go` | Added `AllowSoftwareFallback` field |
+| `internal/jobs/worker.go` | Check config before fallback, fail with guidance if disabled |
+| `internal/jobs/queue.go` | `FailJobDetails.FallbackReason` for user guidance |
+| `internal/api/handler.go` | API endpoints for get/set |
+| `web/templates/index.html` | Settings toggle UI |
+
+### Rate Limiting
+
+When fallback IS enabled, software fallbacks are rate-limited to 5 per 5 minutes to prevent queue flooding if GPU has systemic issues.
+
+---
+
 *End of UX Spec*

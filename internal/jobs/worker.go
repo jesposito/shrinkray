@@ -409,24 +409,33 @@ func (w *Worker) processJob(job *Job) {
 
 		// Check if we have detailed error info from the transcoder
 		if te, ok := err.(*ffmpeg.TranscodeError); ok {
-			// Check if this is a hardware encoder failure that should trigger
-			// automatic software fallback. Only fallback if:
-			// 1. This job was using hardware encoding
-			// 2. This is not already a software fallback (prevent infinite retry)
-			// 3. The error pattern indicates a hardware-specific failure
+			// Check if this is a hardware encoder failure
 			if job.IsHardware && !job.IsSoftwareFallback && te.IsHardwareEncoderFailure() {
-				// Create a software fallback job
-				fallbackJob := w.queue.AddSoftwareFallback(job, "Hardware encoder failed, retrying with software")
-				if fallbackJob != nil {
-					// Mark original job as failed but note the auto-retry
-					w.queue.FailJobWithDetails(job.ID, te.Message+" (auto-retrying with software encoder)", &FailJobDetails{
-						Stderr:     te.Stderr,
-						ExitCode:   te.ExitCode,
-						FFmpegArgs: te.Args,
+				// Only attempt software fallback if explicitly enabled in config
+				if w.cfg.AllowSoftwareFallback {
+					// Create a software fallback job
+					fallbackJob := w.queue.AddSoftwareFallback(job, "GPU encode failed, retried with CPU encode")
+					if fallbackJob != nil {
+						// Mark original job as failed but note the auto-retry
+						w.queue.FailJobWithDetails(job.ID, te.Message+" (auto-retrying with CPU encoder)", &FailJobDetails{
+							Stderr:     te.Stderr,
+							ExitCode:   te.ExitCode,
+							FFmpegArgs: te.Args,
+						})
+						return
+					}
+					// Fallback creation failed (rate limited), fall through to normal failure
+				} else {
+					// Software fallback disabled - fail with clear message and guidance
+					failureMsg := te.Message + " (GPU encode failed and CPU fallback is disabled)"
+					w.queue.FailJobWithDetails(job.ID, failureMsg, &FailJobDetails{
+						Stderr:         te.Stderr,
+						ExitCode:       te.ExitCode,
+						FFmpegArgs:     te.Args,
+						FallbackReason: "Enable 'Allow CPU encode fallback' in Settings to retry on CPU",
 					})
 					return
 				}
-				// Fallback creation failed, fall through to normal failure handling
 			}
 
 			w.queue.FailJobWithDetails(job.ID, te.Message, &FailJobDetails{

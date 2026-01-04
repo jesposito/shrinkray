@@ -572,10 +572,14 @@ func (q *Queue) AddSoftwareFallback(originalJob *Job, fallbackReason string) *Jo
 		InputSize:          originalJob.InputSize,
 		Duration:           originalJob.Duration,
 		Bitrate:            originalJob.Bitrate,
+		BitDepth:           originalJob.BitDepth,
+		PixFmt:             originalJob.PixFmt,
+		SubtitleCodecs:     originalJob.SubtitleCodecs,
 		CreatedAt:          time.Now(),
 		IsSoftwareFallback: true,
 		OriginalJobID:      originalJob.ID,
 		FallbackReason:     fallbackReason,
+		HardwarePath:       "cpu→cpu", // Explicit: software decode and encode
 	}
 
 	q.jobs[job.ID] = job
@@ -845,9 +849,10 @@ func (q *Queue) recordProcessedPathLocked(inputPath string, completedAt time.Tim
 
 // FailJobDetails contains optional diagnostic information for failed jobs
 type FailJobDetails struct {
-	Stderr     string   // Bounded stderr output from ffmpeg
-	ExitCode   int      // FFmpeg exit code
-	FFmpegArgs []string // FFmpeg command arguments used
+	Stderr         string   // Bounded stderr output from ffmpeg
+	ExitCode       int      // FFmpeg exit code
+	FFmpegArgs     []string // FFmpeg command arguments used
+	FallbackReason string   // User-visible suggestion when fallback is disabled
 }
 
 // FailJob marks a job as failed
@@ -875,6 +880,9 @@ func (q *Queue) FailJobWithDetails(id string, errMsg string, details *FailJobDet
 		job.Stderr = details.Stderr
 		job.ExitCode = details.ExitCode
 		job.FFmpegArgs = details.FFmpegArgs
+		if details.FallbackReason != "" {
+			job.FallbackReason = details.FallbackReason
+		}
 	}
 
 	if err := q.save(); err != nil {
