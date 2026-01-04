@@ -2670,6 +2670,11 @@
         let pendingRefreshNeeded = false;
         const REFRESH_DEBOUNCE_MS = 100; // Max 10 refreshes per second
 
+        // Performance: Debounce section updates during rapid SSE events
+        let sectionUpdateTimers = { skipped: null, failed: null, completed: null, virtualScroll: null };
+        let sectionUpdatePending = { skipped: false, failed: false, completed: false, virtualScroll: false };
+        const SECTION_UPDATE_DEBOUNCE_MS = 50; // Batch section updates within 50ms
+
         // Performance: Track stats locally to avoid fetching on every update
         let cachedStats = { pending: 0, pending_probe: 0, running: 0, complete: 0, failed: 0, skipped: 0, no_gain: 0, total_saved: 0 };
 
@@ -2802,6 +2807,14 @@
                 if (idx >= 0) {
                     jobOrder.splice(idx, 1);
                 }
+            }
+        }
+
+        // Remove job from queue display only (keeps it in statusIndex and jobMap for Active panel)
+        function removeJobFromQueueDisplay(jobId) {
+            const idx = jobOrder.indexOf(jobId);
+            if (idx >= 0) {
+                jobOrder.splice(idx, 1);
             }
         }
 
@@ -4275,6 +4288,58 @@
             }, REFRESH_DEBOUNCE_MS);
         }
 
+        // Performance: Debounced section updates for rapid SSE events
+        function debouncedUpdateSkippedSection() {
+            sectionUpdatePending.skipped = true;
+            if (sectionUpdateTimers.skipped) return;
+            sectionUpdateTimers.skipped = setTimeout(() => {
+                sectionUpdateTimers.skipped = null;
+                if (sectionUpdatePending.skipped) {
+                    sectionUpdatePending.skipped = false;
+                    const skippedJobs = cachedJobs.filter(j => j.status === 'skipped' || j.status === 'no_gain');
+                    updateSkippedSection(skippedJobs);
+                }
+            }, SECTION_UPDATE_DEBOUNCE_MS);
+        }
+
+        function debouncedUpdateFailedSection() {
+            sectionUpdatePending.failed = true;
+            if (sectionUpdateTimers.failed) return;
+            sectionUpdateTimers.failed = setTimeout(() => {
+                sectionUpdateTimers.failed = null;
+                if (sectionUpdatePending.failed) {
+                    sectionUpdatePending.failed = false;
+                    const failedJobs = cachedJobs.filter(j => j.status === 'failed');
+                    updateFailedSection(failedJobs);
+                }
+            }, SECTION_UPDATE_DEBOUNCE_MS);
+        }
+
+        function debouncedUpdateCompletedSection() {
+            sectionUpdatePending.completed = true;
+            if (sectionUpdateTimers.completed) return;
+            sectionUpdateTimers.completed = setTimeout(() => {
+                sectionUpdateTimers.completed = null;
+                if (sectionUpdatePending.completed) {
+                    sectionUpdatePending.completed = false;
+                    const completedJobs = cachedJobs.filter(j => j.status === 'complete');
+                    updateCompletedSection(completedJobs);
+                }
+            }, SECTION_UPDATE_DEBOUNCE_MS);
+        }
+
+        function debouncedRenderVirtualJobs() {
+            sectionUpdatePending.virtualScroll = true;
+            if (sectionUpdateTimers.virtualScroll) return;
+            sectionUpdateTimers.virtualScroll = setTimeout(() => {
+                sectionUpdateTimers.virtualScroll = null;
+                if (sectionUpdatePending.virtualScroll) {
+                    sectionUpdatePending.virtualScroll = false;
+                    renderVirtualJobs();
+                }
+            }, SECTION_UPDATE_DEBOUNCE_MS);
+        }
+
         async function refreshJobs() {
             try {
                 const resp = await fetch('/api/jobs');
@@ -4462,9 +4527,9 @@
                 if (el) {
                     el.remove();
                 }
-                // Remove from virtual scroll state if enabled
+                // Remove from queue display only - keep in statusIndex.running and jobMap for Active panel
                 if (virtualScrollEnabled) {
-                    removeJobFromVirtualState(job.id);
+                    removeJobFromQueueDisplay(job.id);
                 }
             }
             // If job completed, move it to the completed section
@@ -4479,9 +4544,7 @@
                 if (virtualScrollEnabled) {
                     removeJobFromVirtualState(job.id);
                 }
-                // Update completed section
-                const completedJobs = cachedJobs.filter(j => j.status === 'complete');
-                updateCompletedSection(completedJobs);
+                // Section update is handled by debounced call in SSE handler
             }
             // If job failed/skipped/no_gain, remove from queue (they have their own sections)
             else if (job.status === 'failed' || job.status === 'skipped' || job.status === 'no_gain') {
@@ -4532,7 +4595,7 @@
             if (virtualScrollEnabled) {
                 removeJobFromVirtualState(job.id);
                 updateVisibleRange();
-                renderVirtualJobs();
+                debouncedRenderVirtualJobs();
             } else {
                 const safeId = escapeCssSelector(job.id);
                 const el = document.querySelector(`.job-item[data-job-id="${safeId}"]`);
@@ -4541,7 +4604,7 @@
                 }
             }
 
-            updateCompletedSection(cachedJobs.filter(j => j.status === 'complete'));
+            debouncedUpdateCompletedSection();
 
             const activeJobs = cachedJobs.filter(j => j.status !== 'complete');
             const container = document.getElementById('queue-list');
@@ -5382,18 +5445,15 @@
                         // Refresh file list to update metadata, but preserve selections
                         browse(currentPath, true, { updateHistory: false });
                     }
-                    // Update sections for terminal states
+                    // Update sections for terminal states (debounced to avoid DOM thrashing)
                     if (data.type === 'skipped' || data.type === 'no_gain') {
-                        const skippedJobs = cachedJobs.filter(j => j.status === 'skipped' || j.status === 'no_gain');
-                        updateSkippedSection(skippedJobs);
+                        debouncedUpdateSkippedSection();
                     }
                     if (data.type === 'failed') {
-                        const failedJobs = cachedJobs.filter(j => j.status === 'failed');
-                        updateFailedSection(failedJobs);
+                        debouncedUpdateFailedSection();
                     }
                     if (data.type === 'complete') {
-                        const completedJobs = cachedJobs.filter(j => j.status === 'complete');
-                        updateCompletedSection(completedJobs);
+                        debouncedUpdateCompletedSection();
                     }
                 } else {
                     // Fallback: debounced full refresh for unknown event types
