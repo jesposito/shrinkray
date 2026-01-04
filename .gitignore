@@ -37,6 +37,15 @@ testdata/
 # Logs
 *.log
 
+# Node / npm
+node_modules/
+package-lock.json
+
+# Playwright
+playwright-report/
+test-results/
+.playwright/
+
 # Housekeeping
 ghcr.sh
 CLAUDE.md

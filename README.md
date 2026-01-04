@@ -276,6 +276,46 @@ go build -o shrinkray ./cmd/shrinkray
 
 Requires Go 1.22+ and FFmpeg with HEVC/AV1 support.
 
+## Testing
+
+### Go Unit Tests
+
+```bash
+go test ./...
+```
+
+### E2E Tests (Playwright)
+
+End-to-end tests verify the web UI works correctly across browsers.
+
+```bash
+# Install dependencies
+npm install
+npx playwright install
+
+# Run tests (requires running server)
+./shrinkray -media /tmp/test-media &
+npm test
+
+# Run with UI (interactive)
+npm run test:ui
+
+# Run headed (see browser)
+npm run test:headed
+
+# View test report
+npm run test:report
+```
+
+**Test suites:**
+- `navigation.spec.ts` - Layout, navigation, keyboard access
+- `file-browser.spec.ts` - File/folder browsing
+- `presets.spec.ts` - Preset selection, help modal
+- `job-queue.spec.ts` - Job display, progress, cancellation
+- `settings.spec.ts` - Settings panel, toggles
+- `sse-streaming.spec.ts` - Real-time updates
+- `accessibility.spec.ts` - A11y checks
+
 ## Docker Image Publishing
 
 The Docker image is automatically built and published to GitHub Container Registry (GHCR) when changes are pushed to the `main` branch.
