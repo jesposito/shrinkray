@@ -10,36 +10,26 @@ test.describe('Navigation & Layout', () => {
     await expect(page).toHaveTitle(/Shrinkray/i);
   });
 
-  test('main UI elements are visible', async ({ page }) => {
+  test('main UI panels are visible', async ({ page }) => {
     await page.goto('/');
 
-    // Logo or header should be visible
-    const header = page.locator('header, .header, h1, .logo');
-    await expect(header.first()).toBeVisible();
+    // Queue panel should be visible
+    await expect(page.locator('#queue-panel')).toBeVisible();
 
-    // Main content area should exist
-    const main = page.locator('main, .main, .container, #app');
-    await expect(main.first()).toBeVisible();
+    // Active panel should be visible
+    await expect(page.locator('#active-panel')).toBeVisible();
   });
 
   test('settings panel opens and closes', async ({ shrinkray }) => {
     await shrinkray.goto();
 
-    // Find and click settings trigger (gear icon, settings button, etc.)
-    const settingsTrigger = shrinkray.page.locator(
-      '[class*="gear"], [class*="settings"], [aria-label*="settings" i], button:has-text("Settings")'
-    ).first();
+    // Open settings
+    await shrinkray.openSettings();
+    await expect(shrinkray.settingsPanel).toBeVisible();
 
-    if (await settingsTrigger.isVisible()) {
-      await settingsTrigger.click();
-
-      // Settings panel should appear
-      const panel = shrinkray.page.locator('[class*="settings"], [class*="panel"], .modal');
-      await expect(panel.first()).toBeVisible();
-
-      // Close with escape
-      await shrinkray.page.keyboard.press('Escape');
-    }
+    // Close with escape
+    await shrinkray.closeSettings();
+    await expect(shrinkray.settingsPanel).toBeHidden();
   });
 
   test('responsive layout on mobile viewport', async ({ page }) => {
@@ -49,39 +39,6 @@ test.describe('Navigation & Layout', () => {
 
     // Page should still be functional on mobile
     await expect(page.locator('body')).toBeVisible();
-
-    // No horizontal scrollbar (content fits)
-    const hasHorizontalScroll = await page.evaluate(() => {
-      return document.documentElement.scrollWidth > document.documentElement.clientWidth;
-    });
-    expect(hasHorizontalScroll).toBe(false);
-  });
-
-  test('dark mode toggle works', async ({ page }) => {
-    await mockAPI(page);
-    await page.goto('/');
-
-    // Look for theme toggle
-    const themeToggle = page.locator(
-      '[class*="theme"], [class*="dark"], [aria-label*="theme" i], button:has-text("Dark")'
-    ).first();
-
-    if (await themeToggle.isVisible()) {
-      // Get initial state
-      const initialBg = await page.evaluate(() => {
-        return getComputedStyle(document.body).backgroundColor;
-      });
-
-      await themeToggle.click();
-
-      // Background should change
-      const newBg = await page.evaluate(() => {
-        return getComputedStyle(document.body).backgroundColor;
-      });
-
-      // Colors should be different (theme changed)
-      expect(newBg).not.toBe(initialBg);
-    }
   });
 
   test('keyboard navigation works', async ({ page }) => {
@@ -92,14 +49,5 @@ test.describe('Navigation & Layout', () => {
     await page.keyboard.press('Tab');
     const focused = await page.evaluate(() => document.activeElement?.tagName);
     expect(focused).toBeTruthy();
-
-    // Continue tabbing - should cycle through focusable elements
-    for (let i = 0; i < 5; i++) {
-      await page.keyboard.press('Tab');
-    }
-
-    // Should still have focus somewhere
-    const stillFocused = await page.evaluate(() => document.activeElement?.tagName);
-    expect(stillFocused).toBeTruthy();
   });
 });

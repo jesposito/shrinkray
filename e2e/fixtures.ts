@@ -22,102 +22,57 @@ export { expect };
 export class ShrinkrayPage {
   constructor(public page: Page) {}
 
-  // Navigation
+  // Navigation - don't wait for networkidle due to SSE
   async goto() {
     await this.page.goto('/');
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState('domcontentloaded');
+    // Wait for initial data load
+    await this.page.waitForTimeout(500);
   }
 
-  // Selectors
-  get fileBrowser() {
-    return this.page.locator('#file-browser, .file-browser, [data-testid="file-browser"]');
-  }
-
+  // Selectors - using specific IDs from actual UI
   get presetDropdown() {
-    return this.page.locator('select#preset, select[name="preset"], #preset-select');
+    return this.page.locator('#preset');
   }
 
   get startButton() {
-    return this.page.locator('button:has-text("Start"), button:has-text("Transcode"), #start-btn');
-  }
-
-  get settingsButton() {
-    return this.page.locator('button[aria-label="Settings"], .settings-btn, button:has-text("Settings"), [data-testid="settings"]');
+    return this.page.locator('#start-btn');
   }
 
   get settingsPanel() {
-    return this.page.locator('#settings-panel, .settings-panel, [data-testid="settings-panel"]');
+    return this.page.locator('#settings-panel');
   }
 
-  get jobQueue() {
-    return this.page.locator('#job-queue, .job-queue, [data-testid="job-queue"]');
+  get queuePanel() {
+    return this.page.locator('#queue-panel');
   }
 
-  get helpMeChooseLink() {
-    return this.page.locator('a:has-text("Help me choose"), button:has-text("Help me choose"), .help-choose');
+  get activePanel() {
+    return this.page.locator('#active-panel');
   }
 
-  get helpModal() {
-    return this.page.locator('#help-modal, .help-modal, [data-testid="help-modal"]');
+  get fileBrowser() {
+    return this.page.locator('#file-browser');
   }
 
   // Actions
-  async selectPreset(presetName: string) {
-    await this.presetDropdown.selectOption({ label: new RegExp(presetName, 'i') });
+  async selectPreset(presetId: string) {
+    await this.presetDropdown.selectOption(presetId);
   }
 
   async openSettings() {
-    // Try multiple possible settings triggers
-    const settingsBtn = this.page.locator('[class*="settings"], button:has-text("Settings"), .gear-icon, [aria-label*="settings" i]').first();
-    if (await settingsBtn.isVisible()) {
-      await settingsBtn.click();
-    }
+    const settingsBtn = this.page.locator('#settings-btn');
+    await settingsBtn.click();
+    await expect(this.settingsPanel).toBeVisible();
   }
 
   async closeSettings() {
-    // Try clicking outside or close button
-    const closeBtn = this.page.locator('.settings-panel .close, button:has-text("Close"), [aria-label="Close"]');
-    if (await closeBtn.isVisible()) {
-      await closeBtn.click();
-    } else {
-      await this.page.keyboard.press('Escape');
-    }
-  }
-
-  async waitForSSEConnection() {
-    // Wait for SSE stream to be established
-    await this.page.waitForFunction(() => {
-      return (window as any).eventSource?.readyState === 1;
-    }, { timeout: 10000 }).catch(() => {
-      // SSE may not be exposed globally, that's ok
-    });
+    await this.page.keyboard.press('Escape');
   }
 
   async getJobCount(): Promise<number> {
-    const jobs = await this.page.locator('.job-item, .job-card, [data-testid="job"]').count();
+    const jobs = await this.page.locator('.queue-item').count();
     return jobs;
-  }
-
-  async toggleSetting(settingName: string, enabled: boolean) {
-    const toggle = this.page.locator(`input[type="checkbox"]:near(:text("${settingName}"))`).first();
-    const isChecked = await toggle.isChecked();
-    if (isChecked !== enabled) {
-      await toggle.click();
-    }
-  }
-
-  // Assertions helpers
-  async expectPresetSelected(presetName: string) {
-    const selected = await this.presetDropdown.inputValue();
-    expect(selected).toContain(presetName.toLowerCase());
-  }
-
-  async expectVisible(element: ReturnType<Page['locator']>) {
-    await expect(element).toBeVisible({ timeout: 5000 });
-  }
-
-  async expectHidden(element: ReturnType<Page['locator']>) {
-    await expect(element).toBeHidden({ timeout: 5000 });
   }
 }
 
@@ -191,6 +146,15 @@ export async function mockAPI(page: Page) {
           { name: 'test.mp4', path: '/media/test.mp4', size: 524288000 },
         ],
       }),
+    });
+  });
+
+  // Mock SSE stream - return empty and close immediately
+  await page.route('**/api/jobs/stream', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/event-stream',
+      body: 'data: []\n\n',
     });
   });
 }
