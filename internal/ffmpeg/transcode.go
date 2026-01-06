@@ -419,6 +419,7 @@ func (t *Transcoder) IsPaused() bool {
 // sourceBitrate is the source video bitrate in bits/second (for dynamic bitrate calculation)
 // bitDepth is the source video bit depth (8, 10, 12) - used for VAAPI format selection
 // pixFmt is the source pixel format (e.g., yuv420p, yuv444p) - used to detect unsupported formats
+// videoCodec is the source video codec (e.g., h264, mpeg4) - used to detect codecs requiring software decode
 func (t *Transcoder) Transcode(
 	ctx context.Context,
 	inputPath string,
@@ -430,6 +431,7 @@ func (t *Transcoder) Transcode(
 	subtitleHandling string,
 	bitDepth int,
 	pixFmt string,
+	videoCodec string,
 	progressCh chan<- Progress,
 ) (*TranscodeResult, error) {
 	startTime := time.Now()
@@ -445,7 +447,8 @@ func (t *Transcoder) Transcode(
 	// inputArgs go before -i (hwaccel), outputArgs go after
 	// bitDepth determines pixel format: nv12 for 8-bit, p010 for 10-bit+
 	// pixFmt determines if special handling is needed (e.g., yuv444p needs software decode)
-	inputArgs, outputArgs := BuildPresetArgs(preset, sourceBitrate, subtitleCodecs, subtitleHandling, bitDepth, pixFmt)
+	// videoCodec determines if codec requires software decode (e.g., mpeg4/xvid)
+	inputArgs, outputArgs := BuildPresetArgs(preset, sourceBitrate, subtitleCodecs, subtitleHandling, bitDepth, pixFmt, videoCodec)
 
 	// Build ffmpeg command
 	// Structure: ffmpeg [inputArgs] -f format -i input [outputArgs] output

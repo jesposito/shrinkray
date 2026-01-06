@@ -18,7 +18,7 @@ func TestBuildPresetArgsDynamicBitrate(t *testing.T) {
 		Codec:   CodecHEVC,
 	}
 
-	_, outputArgs := BuildPresetArgs(preset, sourceBitrate, nil, "convert", 8, "yuv420p")
+	_, outputArgs := BuildPresetArgs(preset, sourceBitrate, nil, "convert", 8, "yuv420p", "h264")
 
 	// Should contain -b:v with calculated bitrate
 	// Expected: 3481 * 0.35 = ~1218k
@@ -53,7 +53,7 @@ func TestBuildPresetArgsDynamicBitrateAV1(t *testing.T) {
 		Codec:   CodecAV1,
 	}
 
-	_, outputArgs := BuildPresetArgs(preset, sourceBitrate, nil, "convert", 8, "yuv420p")
+	_, outputArgs := BuildPresetArgs(preset, sourceBitrate, nil, "convert", 8, "yuv420p", "h264")
 
 	// Expected: 3481 * 0.25 = ~870k
 	for i, arg := range outputArgs {
@@ -80,7 +80,7 @@ func TestBuildPresetArgsBitrateConstraints(t *testing.T) {
 		Codec:   CodecHEVC,
 	}
 
-	_, outputArgs := BuildPresetArgs(presetLow, lowBitrate, nil, "convert", 8, "yuv420p")
+	_, outputArgs := BuildPresetArgs(presetLow, lowBitrate, nil, "convert", 8, "yuv420p", "h264")
 	for i, arg := range outputArgs {
 		if arg == "-b:v" && i+1 < len(outputArgs) {
 			bitrate := outputArgs[i+1]
@@ -101,7 +101,7 @@ func TestBuildPresetArgsBitrateConstraints(t *testing.T) {
 		Codec:   CodecHEVC,
 	}
 
-	_, outputArgs = BuildPresetArgs(presetHigh, highBitrate, nil, "convert", 8, "yuv420p")
+	_, outputArgs = BuildPresetArgs(presetHigh, highBitrate, nil, "convert", 8, "yuv420p", "h264")
 	for i, arg := range outputArgs {
 		if arg == "-b:v" && i+1 < len(outputArgs) {
 			bitrate := outputArgs[i+1]
@@ -124,7 +124,7 @@ func TestBuildPresetArgsNonBitrateEncoder(t *testing.T) {
 		Codec:   CodecHEVC,
 	}
 
-	inputArgs, outputArgs := BuildPresetArgs(presetSoftware, sourceBitrate, nil, "convert", 8, "yuv420p")
+	inputArgs, outputArgs := BuildPresetArgs(presetSoftware, sourceBitrate, nil, "convert", 8, "yuv420p", "h264")
 
 	// Software encoder should have probesize/analyzeduration but no hwaccel input args
 	// Expected: [-probesize 50M -analyzeduration 10M]
@@ -169,7 +169,7 @@ func TestBuildPresetArgsZeroBitrate(t *testing.T) {
 		Codec:   CodecHEVC,
 	}
 
-	_, outputArgs := BuildPresetArgs(presetVT, 0, nil, "convert", 8, "yuv420p")
+	_, outputArgs := BuildPresetArgs(presetVT, 0, nil, "convert", 8, "yuv420p", "h264")
 
 	// Should still have -b:v but with raw modifier value
 	for i, arg := range outputArgs {
@@ -191,17 +191,17 @@ func TestBuildPresetArgsSubtitleHandling(t *testing.T) {
 		Codec:   CodecHEVC,
 	}
 
-	_, outputArgs := BuildPresetArgs(preset, 0, []string{"mov_text"}, "convert", 8, "yuv420p")
+	_, outputArgs := BuildPresetArgs(preset, 0, []string{"mov_text"}, "convert", 8, "yuv420p", "h264")
 	if !containsArgPair(outputArgs, "-c:s", "srt") {
 		t.Errorf("expected -c:s srt when mov_text present and convert enabled, got %v", outputArgs)
 	}
 
-	_, outputArgs = BuildPresetArgs(preset, 0, []string{"mov_text"}, "drop", 8, "yuv420p")
+	_, outputArgs = BuildPresetArgs(preset, 0, []string{"mov_text"}, "drop", 8, "yuv420p", "h264")
 	if !containsArg(outputArgs, "-sn") {
 		t.Errorf("expected -sn when mov_text present and drop enabled, got %v", outputArgs)
 	}
 
-	_, outputArgs = BuildPresetArgs(preset, 0, []string{"srt"}, "convert", 8, "yuv420p")
+	_, outputArgs = BuildPresetArgs(preset, 0, []string{"srt"}, "convert", 8, "yuv420p", "h264")
 	if !containsArgPair(outputArgs, "-c:s", "copy") {
 		t.Errorf("expected -c:s copy when mov_text absent, got %v", outputArgs)
 	}
@@ -241,7 +241,7 @@ func TestBuildPresetArgsVAAPIAV1(t *testing.T) {
 		MaxHeight: 0, // No scaling
 	}
 
-	inputArgs, outputArgs := BuildPresetArgs(preset, 5000000, nil, "convert", 8, "yuv420p")
+	inputArgs, outputArgs := BuildPresetArgs(preset, 5000000, nil, "convert", 8, "yuv420p", "h264")
 
 	// Verify input args contain VAAPI device and hardware acceleration
 	inputArgsStr := strings.Join(inputArgs, " ")
@@ -317,7 +317,7 @@ func TestBuildPresetArgsVAAPIAV1WithScaling(t *testing.T) {
 		MaxHeight: 1080, // Scale to 1080p
 	}
 
-	_, outputArgs := BuildPresetArgs(preset, 10000000, nil, "convert", 8, "yuv420p")
+	_, outputArgs := BuildPresetArgs(preset, 10000000, nil, "convert", 8, "yuv420p", "h264")
 	outputArgsStr := strings.Join(outputArgs, " ")
 	t.Logf("VAAPI AV1 1080p output args: %v", outputArgs)
 
@@ -352,7 +352,7 @@ func TestBuildPresetArgsVAAPIHEVC(t *testing.T) {
 		MaxHeight: 0, // No scaling
 	}
 
-	_, outputArgs := BuildPresetArgs(preset, 5000000, nil, "convert", 8, "yuv420p")
+	_, outputArgs := BuildPresetArgs(preset, 5000000, nil, "convert", 8, "yuv420p", "h264")
 	outputArgsStr := strings.Join(outputArgs, " ")
 	t.Logf("VAAPI HEVC output args: %v", outputArgs)
 
@@ -389,7 +389,7 @@ func TestBuildPresetArgsNonVAAPINoExtraFilter(t *testing.T) {
 		MaxHeight: 0, // No scaling
 	}
 
-	_, outputArgs := BuildPresetArgs(presetSoftware, 5000000, nil, "convert", 8, "yuv420p")
+	_, outputArgs := BuildPresetArgs(presetSoftware, 5000000, nil, "convert", 8, "yuv420p", "h264")
 	outputArgsStr := strings.Join(outputArgs, " ")
 	t.Logf("Software HEVC output args: %v", outputArgs)
 
@@ -407,7 +407,7 @@ func TestBuildPresetArgsNonVAAPINoExtraFilter(t *testing.T) {
 		MaxHeight: 0, // No scaling
 	}
 
-	_, outputArgs = BuildPresetArgs(presetNVENC, 5000000, nil, "convert", 8, "yuv420p")
+	_, outputArgs = BuildPresetArgs(presetNVENC, 5000000, nil, "convert", 8, "yuv420p", "h264")
 	outputArgsStr = strings.Join(outputArgs, " ")
 	t.Logf("NVENC HEVC output args: %v", outputArgs)
 
@@ -488,7 +488,7 @@ func TestBuildPresetArgsVAAPI10Bit(t *testing.T) {
 	}
 
 	// Test 10-bit content
-	_, outputArgs := BuildPresetArgs(preset, 5000000, nil, "convert", 10, "yuv420p10le")
+	_, outputArgs := BuildPresetArgs(preset, 5000000, nil, "convert", 10, "yuv420p10le", "hevc")
 	outputArgsStr := strings.Join(outputArgs, " ")
 	t.Logf("VAAPI HEVC 10-bit output args: %v", outputArgs)
 
@@ -510,7 +510,7 @@ func TestBuildPresetArgsVAAPI10Bit(t *testing.T) {
 	}
 
 	// Test 12-bit content (should also use p010 with bt2020)
-	_, outputArgs = BuildPresetArgs(preset, 5000000, nil, "convert", 12, "yuv420p12le")
+	_, outputArgs = BuildPresetArgs(preset, 5000000, nil, "convert", 12, "yuv420p12le", "hevc")
 	outputArgsStr = strings.Join(outputArgs, " ")
 	t.Logf("VAAPI HEVC 12-bit output args: %v", outputArgs)
 
@@ -545,7 +545,7 @@ func TestBuildPresetArgsVAAPIPreventReconfiguration(t *testing.T) {
 		MaxHeight: 0, // No scaling
 	}
 
-	inputArgs, outputArgs := BuildPresetArgs(preset, 5000000, nil, "convert", 8, "yuv420p")
+	inputArgs, outputArgs := BuildPresetArgs(preset, 5000000, nil, "convert", 8, "yuv420p", "h264")
 	inputArgsStr := strings.Join(inputArgs, " ")
 	t.Logf("VAAPI input args: %v", inputArgs)
 	t.Logf("VAAPI output args: %v", outputArgs)
@@ -613,7 +613,7 @@ func TestBuildPresetArgsVAAPI10BitPreventReconfiguration(t *testing.T) {
 		MaxHeight: 0,
 	}
 
-	inputArgs, _ := BuildPresetArgs(preset, 5000000, nil, "convert", 10, "yuv420p10le")
+	inputArgs, _ := BuildPresetArgs(preset, 5000000, nil, "convert", 10, "yuv420p10le", "hevc")
 	inputArgsStr := strings.Join(inputArgs, " ")
 	t.Logf("VAAPI 10-bit input args: %v", inputArgs)
 
@@ -643,7 +643,7 @@ func TestBuildPresetArgsVAAPI10BitWithScaling(t *testing.T) {
 	}
 
 	// Test 10-bit content with scaling
-	_, outputArgs := BuildPresetArgs(preset, 10000000, nil, "convert", 10, "yuv420p10le")
+	_, outputArgs := BuildPresetArgs(preset, 10000000, nil, "convert", 10, "yuv420p10le", "hevc")
 	outputArgsStr := strings.Join(outputArgs, " ")
 	t.Logf("VAAPI HEVC 10-bit 1080p output args: %v", outputArgs)
 
@@ -680,7 +680,7 @@ func TestBuildPresetArgsVAAPI444pSoftwareDecode(t *testing.T) {
 	}
 
 	// Test yuv444p content (AI upscales from Stargate, etc.)
-	inputArgs, outputArgs := BuildPresetArgs(preset, 14000000, nil, "convert", 8, "yuv444p")
+	inputArgs, outputArgs := BuildPresetArgs(preset, 14000000, nil, "convert", 8, "yuv444p", "h264")
 	inputArgsStr := strings.Join(inputArgs, " ")
 	outputArgsStr := strings.Join(outputArgs, " ")
 	t.Logf("VAAPI 444p input args: %v", inputArgs)
@@ -739,41 +739,135 @@ func TestVAAPIIncompatiblePixFmt(t *testing.T) {
 	}
 }
 
+// TestBuildPresetArgsVAAPIMPEG4SoftwareDecode verifies that MPEG4/XVID content uses software decode
+// with hwupload to VAAPI, since VAAPI can't decode MPEG-4 Part 2 (XVID/DivX) codecs.
+// This addresses the "No support for codec mpeg4 profile 15" error for old AVI files.
+func TestBuildPresetArgsVAAPIMPEG4SoftwareDecode(t *testing.T) {
+	preset := &Preset{
+		ID:        "compress-av1",
+		Name:      "Compress (AV1)",
+		Encoder:   HWAccelVAAPI,
+		Codec:     CodecAV1,
+		MaxHeight: 0, // No scaling
+	}
+
+	// Test MPEG4/XVID content (old DVD rips, VirtualDubMod encoded files)
+	inputArgs, outputArgs := BuildPresetArgs(preset, 1200000, nil, "convert", 8, "yuv420p", "mpeg4")
+	inputArgsStr := strings.Join(inputArgs, " ")
+	outputArgsStr := strings.Join(outputArgs, " ")
+	t.Logf("VAAPI mpeg4 input args: %v", inputArgs)
+	t.Logf("VAAPI mpeg4 output args: %v", outputArgs)
+
+	// Should have -vaapi_device for encoding (required for av1_vaapi)
+	if !strings.Contains(inputArgsStr, "-vaapi_device") {
+		t.Errorf("expected -vaapi_device in input args for VAAPI encoding, got: %s", inputArgsStr)
+	}
+
+	// Should NOT have -hwaccel vaapi (VAAPI can't decode mpeg4)
+	if containsArgPair(inputArgs, "-hwaccel", "vaapi") {
+		t.Errorf("should NOT have -hwaccel vaapi for mpeg4 content (unsupported), got: %s", inputArgsStr)
+	}
+
+	// Should NOT have -hwaccel_output_format vaapi (frames are on CPU)
+	if containsArgPair(inputArgs, "-hwaccel_output_format", "vaapi") {
+		t.Errorf("should NOT have -hwaccel_output_format vaapi for mpeg4 content, got: %s", inputArgsStr)
+	}
+
+	// Filter must include format conversion + hwupload (CPU → GPU path)
+	// format=nv12,hwupload,scale_vaapi=...
+	foundCorrectFilter := false
+	for i, arg := range outputArgs {
+		if arg == "-filter:v:0" && i+1 < len(outputArgs) {
+			filter := outputArgs[i+1]
+			if strings.Contains(filter, "format=nv12") &&
+				strings.Contains(filter, "hwupload") &&
+				strings.Contains(filter, "scale_vaapi") {
+				foundCorrectFilter = true
+				t.Logf("Found correct mpeg4 filter with hwupload: %s", filter)
+			}
+		}
+	}
+
+	if !foundCorrectFilter {
+		t.Errorf("expected filter with format=nv12,hwupload,scale_vaapi for mpeg4 content, got: %s", outputArgsStr)
+	}
+}
+
+// TestVAAPIIncompatibleCodec verifies the codec detection helper.
+// VAAPI can't decode legacy codecs like MPEG-4 Part 2 (XVID), MPEG-2, VC-1, etc.
+func TestVAAPIIncompatibleCodec(t *testing.T) {
+	incompatible := []string{
+		"mpeg4",      // XVID, DivX - common in old AVI files
+		"mpeg2video", // DVD content
+		"wmv3",       // Windows Media Video 9
+		"vc1",        // VC-1
+		"mjpeg",      // Motion JPEG
+		"theora",     // Theora
+	}
+	compatible := []string{
+		"h264",   // H.264/AVC - widely supported
+		"hevc",   // H.265/HEVC
+		"vp8",    // VP8 (on newer hardware)
+		"vp9",    // VP9 (on newer hardware)
+		"av1",    // AV1 (on newer hardware)
+		"",       // Empty string should be compatible (defensive)
+	}
+
+	for _, codec := range incompatible {
+		if !isVAAPIIncompatibleCodec(codec) {
+			t.Errorf("expected %s to be VAAPI incompatible", codec)
+		}
+	}
+
+	for _, codec := range compatible {
+		if isVAAPIIncompatibleCodec(codec) {
+			t.Errorf("expected %s to be VAAPI compatible", codec)
+		}
+	}
+}
+
 func TestGetHardwarePath(t *testing.T) {
 	tests := []struct {
-		encoder  HWAccel
-		pixFmt   string
-		expected string
+		encoder    HWAccel
+		pixFmt     string
+		videoCodec string
+		expected   string
 	}{
-		// VAAPI with compatible format = full GPU pipeline
-		{HWAccelVAAPI, "yuv420p", "vaapi→vaapi"},
-		{HWAccelVAAPI, "nv12", "vaapi→vaapi"},
-		{HWAccelVAAPI, "p010", "vaapi→vaapi"},
+		// VAAPI with compatible format and codec = full GPU pipeline
+		{HWAccelVAAPI, "yuv420p", "h264", "vaapi→vaapi"},
+		{HWAccelVAAPI, "nv12", "hevc", "vaapi→vaapi"},
+		{HWAccelVAAPI, "p010", "hevc", "vaapi→vaapi"},
 
-		// VAAPI with incompatible format = CPU decode
-		{HWAccelVAAPI, "yuv444p", "cpu→vaapi"},
-		{HWAccelVAAPI, "yuv444p10le", "cpu→vaapi"},
+		// VAAPI with incompatible pixel format = CPU decode
+		{HWAccelVAAPI, "yuv444p", "h264", "cpu→vaapi"},
+		{HWAccelVAAPI, "yuv444p10le", "h264", "cpu→vaapi"},
+
+		// VAAPI with incompatible codec (mpeg4/xvid) = CPU decode
+		{HWAccelVAAPI, "yuv420p", "mpeg4", "cpu→vaapi"},
+		{HWAccelVAAPI, "yuv420p", "mpeg2video", "cpu→vaapi"},
+		{HWAccelVAAPI, "yuv420p", "wmv3", "cpu→vaapi"},
 
 		// NVENC uses CUDA for decode
-		{HWAccelNVENC, "yuv420p", "cuda→nvenc"},
-		{HWAccelNVENC, "yuv444p", "cuda→nvenc"},
+		{HWAccelNVENC, "yuv420p", "h264", "cuda→nvenc"},
+		{HWAccelNVENC, "yuv444p", "h264", "cuda→nvenc"},
 
 		// QSV uses VAAPI for decode (on Linux)
-		{HWAccelQSV, "yuv420p", "vaapi→qsv"},
+		{HWAccelQSV, "yuv420p", "h264", "vaapi→qsv"},
 
 		// VideoToolbox
-		{HWAccelVideoToolbox, "yuv420p", "videotoolbox→videotoolbox"},
+		{HWAccelVideoToolbox, "yuv420p", "h264", "videotoolbox→videotoolbox"},
 
 		// Software encoding
-		{HWAccelNone, "yuv420p", "cpu→cpu"},
-		{HWAccelNone, "yuv444p", "cpu→cpu"},
+		{HWAccelNone, "yuv420p", "h264", "cpu→cpu"},
+		{HWAccelNone, "yuv444p", "h264", "cpu→cpu"},
+		{HWAccelNone, "yuv420p", "mpeg4", "cpu→cpu"}, // Software handles all codecs
 	}
 
 	for _, tt := range tests {
-		result := GetHardwarePath(tt.encoder, tt.pixFmt)
+		result := GetHardwarePath(tt.encoder, tt.pixFmt, tt.videoCodec)
 		if result != tt.expected {
-			t.Errorf("GetHardwarePath(%s, %s) = %s, expected %s",
-				tt.encoder, tt.pixFmt, result, tt.expected)
+			t.Errorf("GetHardwarePath(%s, %s, %s) = %s, expected %s",
+				tt.encoder, tt.pixFmt, tt.videoCodec, result, tt.expected)
 		}
 	}
 }

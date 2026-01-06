@@ -372,7 +372,7 @@ func (w *Worker) processJob(job *Job) {
 	tempPath := ffmpeg.BuildTempPath(job.InputPath, tempDir)
 
 	// Determine the hardware path (decode→encode pipeline)
-	hardwarePath := ffmpeg.GetHardwarePath(preset.Encoder, job.PixFmt)
+	hardwarePath := ffmpeg.GetHardwarePath(preset.Encoder, job.PixFmt, job.VideoCodec)
 
 	// Mark job as started
 	if err := w.queue.StartJob(job.ID, tempPath, hardwarePath); err != nil {
@@ -393,7 +393,7 @@ func (w *Worker) processJob(job *Job) {
 
 	// Run the transcode
 	duration := time.Duration(job.Duration) * time.Millisecond
-	result, err := w.transcoder.Transcode(jobCtx, job.InputPath, tempPath, preset, duration, job.Bitrate, job.SubtitleCodecs, w.cfg.SubtitleHandling, job.BitDepth, job.PixFmt, progressCh)
+	result, err := w.transcoder.Transcode(jobCtx, job.InputPath, tempPath, preset, duration, job.Bitrate, job.SubtitleCodecs, w.cfg.SubtitleHandling, job.BitDepth, job.PixFmt, job.VideoCodec, progressCh)
 
 	if err != nil {
 		// Check if it was cancelled

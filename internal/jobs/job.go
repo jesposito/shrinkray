@@ -42,6 +42,7 @@ type Job struct {
 	Bitrate        int64     `json:"bitrate,omitempty"`        // Source video bitrate in bits/s
 	BitDepth       int       `json:"bit_depth,omitempty"`      // Color bit depth (8, 10, 12)
 	PixFmt         string    `json:"pix_fmt,omitempty"`        // Pixel format (e.g., yuv420p, yuv444p)
+	VideoCodec     string    `json:"video_codec,omitempty"`    // Source video codec (e.g., h264, mpeg4, hevc)
 	TranscodeTime  int64     `json:"transcode_secs,omitempty"` // Time to transcode in seconds
 	CreatedAt      time.Time `json:"created_at"`
 	StartedAt      time.Time `json:"started_at,omitempty"`

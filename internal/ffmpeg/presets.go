@@ -188,12 +188,58 @@ func isVAAPIIncompatiblePixFmt(pixFmt string) bool {
 	return false
 }
 
+// isVAAPIIncompatibleCodec returns true if the video codec cannot be hardware decoded by VAAPI.
+// These codecs require software decode + hwupload to VAAPI for encoding.
+// VAAPI typically only supports H.264, HEVC, VP8/VP9 (on newer hardware), and AV1.
+// Legacy codecs like MPEG-4 Part 2 (XVID/DivX), MPEG-2, VC-1 are not supported.
+func isVAAPIIncompatibleCodec(codec string) bool {
+	codec = strings.ToLower(codec)
+	incompatible := []string{
+		"mpeg4",      // MPEG-4 Part 2 (XVID, DivX, etc.) - error: "No support for codec mpeg4 profile 15"
+		"msmpeg4v3",  // Microsoft MPEG-4 v3
+		"msmpeg4v2",  // Microsoft MPEG-4 v2
+		"msmpeg4v1",  // Microsoft MPEG-4 v1
+		"wmv1",       // Windows Media Video 7
+		"wmv2",       // Windows Media Video 8
+		"wmv3",       // Windows Media Video 9 (VC-1 Simple/Main Profile)
+		"vc1",        // VC-1 Advanced Profile
+		"mpeg1video", // MPEG-1
+		"mpeg2video", // MPEG-2 (limited VAAPI support, often fails)
+		"mjpeg",      // Motion JPEG
+		"dvvideo",    // DV video
+		"theora",     // Theora
+		"vp6",        // VP6
+		"vp6f",       // VP6 Flash
+		"flv1",       // FLV / Sorenson Spark
+		"h263",       // H.263
+		"h263p",      // H.263+
+		"rv10",       // RealVideo 1.0
+		"rv20",       // RealVideo 2.0
+		"rv30",       // RealVideo 3.0
+		"rv40",       // RealVideo 4.0
+		"svq1",       // Sorenson Video 1
+		"svq3",       // Sorenson Video 3
+		"cinepak",    // Cinepak
+		"indeo2",     // Intel Indeo 2
+		"indeo3",     // Intel Indeo 3
+		"indeo4",     // Intel Indeo 4
+		"indeo5",     // Intel Indeo 5
+	}
+	for _, c := range incompatible {
+		if codec == c {
+			return true
+		}
+	}
+	return false
+}
+
 // BuildPresetArgs builds FFmpeg arguments for a preset with the specified encoder
 // sourceBitrate is the source video bitrate in bits/second (used for dynamic bitrate calculation)
 // bitDepth is the source video bit depth (8, 10, 12) - used for VAAPI format selection
 // pixFmt is the source pixel format - used to detect formats requiring software decode
+// videoCodec is the source video codec - used to detect codecs requiring software decode (e.g., mpeg4/xvid)
 // Returns (inputArgs, outputArgs) - inputArgs go before -i, outputArgs go after
-func BuildPresetArgs(preset *Preset, sourceBitrate int64, subtitleCodecs []string, subtitleHandling string, bitDepth int, pixFmt string) (inputArgs []string, outputArgs []string) {
+func BuildPresetArgs(preset *Preset, sourceBitrate int64, subtitleCodecs []string, subtitleHandling string, bitDepth int, pixFmt string, videoCodec string) (inputArgs []string, outputArgs []string) {
 	key := EncoderKey{preset.Encoder, preset.Codec}
 	config, ok := encoderConfigs[key]
 	if !ok {
@@ -210,9 +256,11 @@ func BuildPresetArgs(preset *Preset, sourceBitrate int64, subtitleCodecs []strin
 	)
 
 	// Hardware acceleration for decoding
-	// Skip hwaccel for pixel formats that VAAPI can't decode (e.g., yuv444p from AI upscales)
+	// Skip hwaccel for pixel formats or codecs that VAAPI can't decode
+	// Examples: yuv444p from AI upscales, mpeg4/xvid from old rips
 	// These require software decode → format conversion → hwupload → VAAPI encode
-	useHWAccelDecode := !isVAAPIIncompatiblePixFmt(pixFmt) || preset.Encoder != HWAccelVAAPI
+	vaapiIncompatible := isVAAPIIncompatiblePixFmt(pixFmt) || isVAAPIIncompatibleCodec(videoCodec)
+	useHWAccelDecode := !vaapiIncompatible || preset.Encoder != HWAccelVAAPI
 	if useHWAccelDecode {
 		for _, arg := range config.hwaccelArgs {
 			// Fill in VAAPI device path dynamically
@@ -267,8 +315,8 @@ func BuildPresetArgs(preset *Preset, sourceBitrate int64, subtitleCodecs []strin
 		// Check if decode outputs frames directly to VAAPI GPU memory.
 		// QSV uses VAAPI decode but without -hwaccel_output_format, so frames
 		// download to CPU. This check ensures correct filter chain selection.
-		// Also force CPU path for incompatible pixel formats (yuv444p, etc.)
-		framesOnGPU := hasVAAPIOutputFormat(config.hwaccelArgs) && !isVAAPIIncompatiblePixFmt(pixFmt)
+		// Also force CPU path for incompatible pixel formats (yuv444p) or codecs (mpeg4/xvid)
+		framesOnGPU := hasVAAPIOutputFormat(config.hwaccelArgs) && !vaapiIncompatible
 
 		// Select output pixel format and color parameters based on source bit depth:
 		// - 8-bit content: nv12 with bt709 color (standard SDR)
@@ -515,14 +563,14 @@ func ListPresets() []*Preset {
 // GetHardwarePath returns a human-readable string describing the decode→encode pipeline.
 // Examples: "vaapi→vaapi", "cpu→vaapi", "cpu→cpu", "cuda→nvenc", "vaapi→qsv"
 // This reflects the actual hwaccelArgs configuration in encoderConfigs.
-func GetHardwarePath(encoder HWAccel, pixFmt string) string {
+func GetHardwarePath(encoder HWAccel, pixFmt string, videoCodec string) string {
 	// Determine decode method based on actual hwaccel configuration
 	// See encoderConfigs for the hwaccelArgs used by each encoder
 	var decode string
 	switch encoder {
 	case HWAccelVAAPI:
-		// VAAPI uses -hwaccel vaapi, but falls back to CPU for incompatible formats
-		if isVAAPIIncompatiblePixFmt(pixFmt) {
+		// VAAPI uses -hwaccel vaapi, but falls back to CPU for incompatible formats/codecs
+		if isVAAPIIncompatiblePixFmt(pixFmt) || isVAAPIIncompatibleCodec(videoCodec) {
 			decode = "cpu"
 		} else {
 			decode = "vaapi"

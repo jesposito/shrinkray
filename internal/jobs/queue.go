@@ -491,6 +491,7 @@ func (q *Queue) UpdateJobAfterProbe(id string, probe *ffmpeg.ProbeResult) error 
 	job.SubtitleCodecs = probe.SubtitleCodecs
 	job.BitDepth = probe.BitDepth
 	job.PixFmt = probe.PixFmt
+	job.VideoCodec = probe.VideoCodec
 
 	// Check if file should be skipped
 	preset := ffmpeg.GetPreset(job.PresetID)
@@ -574,6 +575,7 @@ func (q *Queue) AddSoftwareFallback(originalJob *Job, fallbackReason string) *Jo
 		Bitrate:            originalJob.Bitrate,
 		BitDepth:           originalJob.BitDepth,
 		PixFmt:             originalJob.PixFmt,
+		VideoCodec:         originalJob.VideoCodec,
 		SubtitleCodecs:     originalJob.SubtitleCodecs,
 		CreatedAt:          time.Now(),
 		IsSoftwareFallback: true,

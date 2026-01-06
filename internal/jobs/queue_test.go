@@ -412,6 +412,7 @@ func TestAddSoftwareFallback(t *testing.T) {
 	job.IsHardware = true
 	job.BitDepth = 8
 	job.PixFmt = "yuv420p"
+	job.VideoCodec = "h264"
 
 	// Create a software fallback
 	fallbackJob := queue.AddSoftwareFallback(job, "GPU encode failed, retried with CPU encode")
@@ -452,6 +453,9 @@ func TestAddSoftwareFallback(t *testing.T) {
 	}
 	if fallbackJob.PixFmt != job.PixFmt {
 		t.Error("PixFmt not copied to fallback job")
+	}
+	if fallbackJob.VideoCodec != job.VideoCodec {
+		t.Error("VideoCodec not copied to fallback job")
 	}
 }
 
