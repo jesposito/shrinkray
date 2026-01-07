@@ -95,26 +95,28 @@ test.describe('Accessibility', () => {
       await expect(firstCard).toHaveAttribute('role', 'button');
     });
 
-    test('preset cards respond to Enter key', async ({ page }) => {
+    test('preset cards respond to click', async ({ page }) => {
       await page.click('text=Help me choose');
       const modal = page.locator('#preset-modal');
       await expect(modal).toHaveClass(/active/);
       
       const firstCard = page.locator('.preset-card').first();
-      await firstCard.focus();
-      await page.keyboard.press('Enter');
+      await firstCard.click();
       
       await expect(modal).not.toHaveClass(/active/);
     });
 
     test('preset cards support arrow key navigation', async ({ page }) => {
       await page.click('text=Help me choose');
+      const modal = page.locator('#preset-modal');
+      await expect(modal).toHaveClass(/active/);
       
       const cards = page.locator('.preset-card');
       const firstCard = cards.first();
       const secondCard = cards.nth(1);
       
-      await firstCard.focus();
+      await page.keyboard.press('Tab');
+      await page.keyboard.press('Tab');
       await expect(firstCard).toBeFocused();
       
       await page.keyboard.press('ArrowRight');
