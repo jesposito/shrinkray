@@ -1,32 +1,82 @@
-# Shrinkray
+<div align="center">
+  <img src="web/templates/logo.png" alt="Shrinkray" width="128" height="128">
+  <h1>Shrinkray</h1>
+  <p><strong>Simple video transcoding for Unraid</strong></p>
+  <p>Select a folder. Pick a preset. Shrink your media library.</p>
 
-> **This is a community fork of [gwlsn/shrinkray](https://github.com/gwlsn/shrinkray).**
->
-> The original project focuses on UI polish, scheduling, and quality controls.
-> This fork focuses on hardware encoding reliability and auth.
->
-> **Choose the original if you want:** A simpler click and go experience.
->
-> **Choose this fork if you need:** VAAPI fixes for Intel Arc/AMD, authentication (OIDC/password), ntfy notifications
+  ![Go](https://img.shields.io/badge/go-1.22+-00ADD8?style=flat-square&logo=go)
+  ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
+  ![Docker](https://img.shields.io/badge/docker-ghcr.io-2496ED?style=flat-square&logo=docker)
+</div>
 
-A simple video transcoding tool for Unraid. Select a folder, pick a preset, and shrink your media library.
+---
 
-## Fork Differences
+## About This Fork
 
-If you're running Intel Arc, AMD VAAPI, or need authentication—use this fork.
-Otherwise use [the original](https://github.com/gwlsn/shrinkray).
+This is a community fork of [gwlsn/shrinkray](https://github.com/gwlsn/shrinkray), the excellent video transcoding tool created by [@gwlsn](https://github.com/gwlsn).
 
-## Quick Start (Unraid)
+Both projects share the same core goal: make video transcoding simple and accessible. This fork extends the original with additional features for users who need authentication or have specific hardware configurations.
 
-1. Install from Community Applications (search "Shrinkray") or add manually:
+### Which Should You Use?
+
+| Use Case | Recommendation |
+|----------|----------------|
+| Simple home setup, no auth needed | [Original](https://github.com/gwlsn/shrinkray) — cleaner, more focused |
+| Intel Arc GPU (A380, A770, B580) | **This fork** — extensive VAAPI fixes |
+| AMD GPU on Linux | **This fork** — improved VAAPI support |
+| Need authentication (OIDC/password) | **This fork** — full auth support |
+| Want ntfy notifications | **This fork** — ntfy + Pushover |
+| Prefer mature, stable release | [Original](https://github.com/gwlsn/shrinkray) |
+
+Both versions include: GPU acceleration, scheduling, quality controls, batch selection, Pushover notifications, and smart skipping.
+
+---
+
+## Features
+
+- **Smart Presets** — HEVC compress, AV1 compress, 1080p downscale, 720p downscale
+- **Full GPU Pipeline** — Hardware decoding AND encoding (frames stay on GPU)
+- **Batch Selection** — Select entire folders to transcode whole seasons at once
+- **Scheduling** — Restrict transcoding to specific hours (e.g., overnight only)
+- **Quality Control** — Adjustable CRF for fine-tuned compression
+- **Smart Skipping** — Automatically skips files already in target codec/resolution
+- **Authentication** — Password or OIDC (Authentik, Keycloak, etc.)
+- **Notifications** — Pushover and ntfy support
+- **CPU Fallback** — Optional automatic retry with software encoding
+
+---
+
+## Quick Start
+
+### Unraid (Community Applications)
+
+1. Search **"Shrinkray"** in Community Applications, or add manually:
    - **Repository**: `ghcr.io/jesposito/shrinkray:latest`
    - **WebUI**: `8080`
    - **Volumes**: `/config` → appdata, `/media` → your media library
-   - **Optional**: `/temp` → fast storage for temp file
+2. For GPU acceleration, pass through your GPU device (see [Hardware Acceleration](#hardware-acceleration))
+3. Open the WebUI at port **8080**
 
-2. Open the WebUI, browse to a folder, select files, and click **Start Transcode**
+### Docker Compose
 
-## Quick Start (Docker)
+```yaml
+services:
+  shrinkray:
+    image: ghcr.io/jesposito/shrinkray:latest
+    container_name: shrinkray
+    ports:
+      - 8080:8080
+    volumes:
+      - /path/to/config:/config
+      - /path/to/media:/media
+      - /path/to/fast/storage:/temp  # Optional: SSD for temp files
+    environment:
+      - PUID=99
+      - PGID=100
+    restart: unless-stopped
+```
+
+### Docker CLI
 
 ```bash
 docker run -d \
@@ -39,50 +89,38 @@ docker run -d \
   ghcr.io/jesposito/shrinkray:latest
 ```
 
-**Optional**: For better performance, mount fast storage for temp files:
-
-```bash
-  -v /path/to/fast/storage:/temp
-```
-
-For hardware acceleration, add the appropriate device:
-
-```bash
-# Intel QSV / AMD VAAPI
---device /dev/dri:/dev/dri
-
-# NVIDIA (requires Nvidia-Driver plugin on Unraid)
---runtime=nvidia --gpus all
-```
+---
 
 ## Presets
 
-| Preset | Description |
-|--------|-------------|
-| **Compress (HEVC)** | Re-encode to H.265 (HEVC) |
-| **Compress (AV1)** | Re-encode to AV1 |
-| **1080p** | Downscale to 1080p + HEVC |
-| **720p** | Downscale to 720p + HEVC |
+| Preset | Codec | Description | Typical Savings |
+|--------|-------|-------------|-----------------|
+| **Compress (HEVC)** | H.265 | Re-encode to HEVC | 40–60% smaller |
+| **Compress (AV1)** | AV1 | Re-encode to AV1 | 50–70% smaller |
+| **1080p** | HEVC | Downscale 4K → 1080p | 60–80% smaller |
+| **720p** | HEVC | Downscale to 720p | 70–85% smaller |
 
-All presets copy audio, and subtitle streams are copied unless a `mov_text` subtitle needs conversion for MKV output.
+All presets copy audio and subtitles unchanged (stream copy).
+
+---
 
 ## Hardware Acceleration
 
-Automatically detected and used when available:
+Shrinkray automatically detects and uses the best available hardware encoder—no configuration required, just pass through your GPU.
 
-| Platform | Encoder |
-|----------|---------|
-| Intel | Quick Sync (QSV) |
-| Intel Arc | VAAPI |
-| NVIDIA | NVENC |
-| AMD (Linux) | VAAPI |
-| macOS | VideoToolbox |
+### Supported Hardware
 
-Falls back to software encoding if no hardware is available.
+| Platform | Requirements | Docker Flags |
+|----------|--------------|--------------|
+| **NVIDIA (NVENC)** | GTX 1050+ / RTX series | `--runtime=nvidia --gpus all` |
+| **Intel Quick Sync** | 6th gen+ CPU | `--device /dev/dri:/dev/dri` |
+| **Intel Arc** | Arc A-series / B-series | `--device /dev/dri:/dev/dri` + see below |
+| **AMD (VAAPI)** | Polaris+ GPU on Linux | `--device /dev/dri:/dev/dri` |
+| **Apple (VideoToolbox)** | Any Mac (M1/M2/M3 or Intel) | Native (no Docker) |
 
-### Intel Arc GPU Setup (Docker/Unraid)
+### Intel Arc GPU Setup
 
-For Intel Arc A380, A770, B580 and similar GPUs:
+Intel Arc GPUs (A380, A770, B580, etc.) require specific configuration:
 
 ```bash
 docker run -d \
@@ -99,16 +137,27 @@ docker run -d \
 ```
 
 Key settings:
-- `--device /dev/dri:/dev/dri` - Pass GPU device to container
-- `--group-add render` - Add render group permissions (may need GID like `105`)
-- `-e LIBVA_DRIVER_NAME=iHD` - Intel Arc requires the iHD driver
+- `--device /dev/dri:/dev/dri` — Pass GPU device to container
+- `--group-add render` — Add render group permissions (may need GID like `105`)
+- `-e LIBVA_DRIVER_NAME=iHD` — Intel Arc requires the iHD driver
 
-**Verify GPU access:**
+Verify GPU access:
 ```bash
 docker exec -it shrinkray vainfo
 ```
 
-### Troubleshooting VAAPI
+### AV1 Hardware Requirements
+
+AV1 hardware encoding requires newer GPUs:
+
+| Platform | Minimum Hardware |
+|----------|------------------|
+| **NVIDIA** | RTX 40 series (Ada Lovelace) |
+| **Intel** | Arc GPUs, 14th gen+ iGPUs |
+| **Apple** | M3 chip or newer |
+| **AMD** | RX 7000 series (RDNA 3) |
+
+### VAAPI Troubleshooting
 
 | Error | Cause | Fix |
 |-------|-------|-----|
@@ -117,240 +166,177 @@ docker exec -it shrinkray vainfo
 | "Cannot open DRM render node" | No GPU access | Add `--device /dev/dri:/dev/dri` |
 | "vaInitialize failed" | Wrong driver | Set `LIBVA_DRIVER_NAME=iHD` for Intel Arc |
 | "Permission denied" | Render group missing | Add `--group-add render` or GID |
+| MPEG4/XVID decode failures | Legacy codec VAAPI issue | Update to latest version (fixed) |
 
-## Settings
+---
 
-Access via the gear icon in the WebUI:
+## Scheduling
 
-- **Original files**: Delete after transcode, or keep as `.old`
-- **Concurrent jobs**: 1-6 simultaneous transcodes
-- **Allow CPU encode fallback**: Retry failed GPU encodes with CPU (off by default)
-- **Pushover notifications**: Get notified when all jobs complete
-- **ntfy notifications**: Send notifications to an ntfy topic
+Restrict transcoding to specific hours to reduce system load during the day.
 
-### CPU Encode Fallback
+1. Open **Settings** (gear icon)
+2. Enable **Schedule transcoding**
+3. Set start and end hours (e.g., 22:00 – 06:00 for overnight)
 
-By default, if a GPU encode fails, the job fails with a clear error message. This is intentional—on systems with working VAAPI (Intel Arc, AMD), GPU encodes should succeed. A failure usually indicates a configuration problem that should be fixed.
+**Behavior:**
+- Jobs can always be added to the queue
+- Transcoding only runs during the allowed window
+- Running jobs complete even if the window closes
+- Jobs automatically resume when the window reopens
 
-Enable **"Allow CPU encode fallback"** only if:
-- A small number of files fail due to unusual codecs or formats
-- You want those files transcoded anyway, even if slower
-- You've verified your GPU is working correctly for other files
+---
 
-When enabled, failed GPU encodes automatically retry with CPU encoding (slower but more compatible). The job status will show "Retrying with CPU encode" so you know what happened.
+## Authentication
 
-**Unraid + Intel Arc users**: Keep this OFF. If encodes are failing, check your VAAPI setup first (see Troubleshooting VAAPI section).
+This fork supports optional authentication to protect your Shrinkray instance.
 
-## Pushover Notifications
-
-1. Create an app at [pushover.net](https://pushover.net)
-2. Enter your **User Key** and **App Token** in Settings
-3. Check **"Notify when done"** in the queue header before starting jobs
-
-You'll receive a notification with job counts and total space saved when the queue empties.
-
-## ntfy Notifications
-
-1. Pick an ntfy server (default: `https://ntfy.sh`) and topic
-2. Enter the server, topic, and optional token in Settings
-3. Check **"Notify when done"** in the queue header before starting jobs
-
-You'll receive a notification with job counts and total space saved when the queue empties.
-
-## Configuration
-
-Config is stored in `/config/shrinkray.yaml`. Most settings are available in the WebUI, but you can also edit the file directly:
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `media_path` | `/media` | Root directory to browse for media files |
-| `temp_path` | *(empty)* | Directory for temp files during transcode. If empty, uses same directory as source file |
-| `original_handling` | `replace` | What to do with originals: `replace` (delete) or `keep` (rename to `.old`) |
-| `subtitle_handling` | `convert` | How to handle unsupported subtitles: `convert` (convert `mov_text` to SRT) or `drop` (remove unsupported subtitles) |
-| `workers` | `1` | Number of concurrent transcode jobs (1-6) |
-| `ffmpeg_path` | `ffmpeg` | Path to ffmpeg binary |
-| `ffprobe_path` | `ffprobe` | Path to ffprobe binary |
-| `pushover_user_key` | *(empty)* | Pushover user key for notifications |
-| `pushover_app_token` | *(empty)* | Pushover application token for notifications |
-| `ntfy_server` | `https://ntfy.sh` | ntfy server URL for notifications |
-| `ntfy_topic` | *(empty)* | ntfy topic for notifications |
-| `ntfy_token` | *(empty)* | ntfy access token (optional) |
-| `allow_software_fallback` | `false` | Retry failed GPU encodes with CPU (see CPU Encode Fallback) |
-| `auth.enabled` | `false` | Require authentication |
-| `auth.provider` | `noop` | Auth provider name (`noop`, `password`) |
-| `auth.secret` | *(empty)* | HMAC secret used to sign session cookies |
-| `auth.bypass_paths` | *(empty)* | Extra unauthenticated paths (comma-separated in env) |
-| `auth.password.hash_algo` | `auto` | Password hash algorithm (`auto`, `bcrypt`, `argon2id`) |
-| `auth.password.users` | *(empty)* | Map of usernames to password hashes |
-| `auth.oidc.issuer` | *(empty)* | OIDC issuer URL |
-| `auth.oidc.client_id` | *(empty)* | OIDC client ID |
-| `auth.oidc.client_secret` | *(empty)* | OIDC client secret |
-| `auth.oidc.redirect_url` | *(empty)* | Callback URL registered with the IdP |
-| `auth.oidc.scopes` | `["openid","profile","email"]` | OIDC scopes (openid is always enforced) |
-| `auth.oidc.group_claim` | *(empty)* | Claim containing group membership |
-| `auth.oidc.allowed_groups` | *(empty)* | Allowed groups (any match grants access) |
-
-Example:
-
-```yaml
-media_path: /media
-temp_path: /tmp/shrinkray
-original_handling: replace
-subtitle_handling: convert
-workers: 2
-```
-
-Auth example:
+### Password Authentication
 
 ```yaml
 auth:
   enabled: true
   provider: password
-  secret: "change-me"
+  secret: "your-random-secret-here"
   password:
     hash_algo: auto
     users:
-      admin: "$2b$12$abcdefghijklmnopqrstuv1234567890abcdefghijklmnopqrstuv"
+      admin: "$2b$12$..." # bcrypt hash
 ```
 
-OIDC example:
+Generate a password hash:
+```bash
+htpasswd -nbB admin yourpassword | cut -d: -f2
+```
+
+### OIDC Authentication
+
+Works with Authentik, Keycloak, Authelia, and other OIDC providers:
 
 ```yaml
 auth:
   enabled: true
   provider: oidc
-  secret: "change-me"
+  secret: "your-random-secret-here"
   oidc:
-    issuer: "https://accounts.example.com"
+    issuer: "https://auth.example.com"
     client_id: "shrinkray"
-    client_secret: "super-secret"
+    client_secret: "your-client-secret"
     redirect_url: "https://shrinkray.example.com/auth/callback"
     scopes: ["openid", "profile", "email", "groups"]
     group_claim: "groups"
-    allowed_groups: ["media-admins", "ops"]
+    allowed_groups: ["media-admins"]
 ```
 
-Environment overrides:
+Configure your IdP with:
+- **Redirect URL:** `https://<your-host>/auth/callback`
+- **Grant type:** Authorization Code
+
+Environment variable overrides are also supported—see [Configuration](#configuration).
+
+---
+
+## Notifications
+
+### Pushover
+
+1. Create an app at [pushover.net](https://pushover.net)
+2. Enter your **User Key** and **App Token** in Settings
+3. Check **"Notify when done"** before starting jobs
+
+### ntfy
+
+1. Pick a server (default: `https://ntfy.sh`) and topic
+2. Enter the server, topic, and optional token in Settings
+3. Check **"Notify when done"** before starting jobs
+
+Notifications include job counts and total space saved when the queue empties.
+
+---
+
+## Configuration
+
+Config is stored in `/config/shrinkray.yaml`. Most settings are available in the WebUI.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `media_path` | `/media` | Root directory to browse |
+| `temp_path` | *(empty)* | Fast storage for temp files (SSD recommended) |
+| `original_handling` | `replace` | `replace` = delete original, `keep` = rename to `.old` |
+| `subtitle_handling` | `convert` | `convert` or `drop` unsupported subtitles |
+| `workers` | `1` | Concurrent transcode jobs (1–6) |
+| `quality_hevc` | `0` | CRF override for HEVC (0 = default, 15–40) |
+| `quality_av1` | `0` | CRF override for AV1 (0 = default, 20–50) |
+| `schedule_enabled` | `false` | Enable time-based scheduling |
+| `schedule_start_hour` | `22` | Hour transcoding may start (0–23) |
+| `schedule_end_hour` | `6` | Hour transcoding must stop (0–23) |
+| `allow_software_fallback` | `false` | Retry failed GPU encodes with CPU |
+| `pushover_user_key` | *(empty)* | Pushover user key |
+| `pushover_app_token` | *(empty)* | Pushover app token |
+| `ntfy_server` | `https://ntfy.sh` | ntfy server URL |
+| `ntfy_topic` | *(empty)* | ntfy topic |
+| `ntfy_token` | *(empty)* | ntfy access token (optional) |
+
+### Environment Variables
+
+All settings can be overridden with environment variables using the `SHRINKRAY_` prefix:
 
 ```bash
-# Enable CPU fallback for edge-case files
+SHRINKRAY_WORKERS=2
 SHRINKRAY_ALLOW_SOFTWARE_FALLBACK=true
-
-# Authentication
 SHRINKRAY_AUTH_ENABLED=1
 SHRINKRAY_AUTH_PROVIDER=password
 SHRINKRAY_AUTH_SECRET=change-me
-SHRINKRAY_AUTH_USERS='admin:$2b$12$abcdefghijklmnopqrstuv1234567890abcdefghijklmnopqrstuv'
 ```
 
-OIDC overrides:
+---
 
-```bash
-SHRINKRAY_AUTH_ENABLED=1
-SHRINKRAY_AUTH_PROVIDER=oidc
-SHRINKRAY_AUTH_SECRET=change-me
-SHRINKRAY_AUTH_OIDC_ISSUER=https://accounts.example.com
-SHRINKRAY_AUTH_OIDC_CLIENT_ID=shrinkray
-SHRINKRAY_AUTH_OIDC_CLIENT_SECRET=super-secret
-SHRINKRAY_AUTH_OIDC_REDIRECT_URL=https://shrinkray.example.com/auth/callback
-SHRINKRAY_AUTH_OIDC_SCOPES="openid,profile,email,groups"
-SHRINKRAY_AUTH_OIDC_GROUP_CLAIM=groups
-SHRINKRAY_AUTH_OIDC_ALLOWED_GROUPS="media-admins,ops"
-```
+## CPU Fallback
 
-### OIDC IdP Settings
+By default, if a GPU encode fails, the job fails with a clear error message. This is intentional—GPU encodes should succeed on properly configured systems.
 
-Configure your identity provider with:
+Enable **"Allow CPU encode fallback"** only if:
+- A small number of files fail due to unusual codecs
+- You want those files transcoded anyway, even if slower
+- You've verified your GPU is working correctly for other files
 
-- **Redirect/Callback URL:** `https://<your-host>/auth/callback`
-- **Grant type:** Authorization Code (OIDC)
-- **Scopes:** `openid` plus any additional scopes (e.g., `profile`, `email`, `groups`)
-- **Group claim:** Ensure your IdP includes the configured `group_claim` (string or array)
+When enabled, failed GPU encodes automatically retry with software encoding.
+
+---
 
 ## Building from Source
 
 ```bash
+git clone https://github.com/jesposito/shrinkray.git
+cd shrinkray
+
 go build -o shrinkray ./cmd/shrinkray
 ./shrinkray -media /path/to/media
 ```
 
-Requires Go 1.22+ and FFmpeg with HEVC/AV1 support.
+**Requirements:** Go 1.22+, FFmpeg with HEVC/AV1 support
 
-## Testing
-
-### Go Unit Tests
+### Running Tests
 
 ```bash
+# Go unit tests
 go test ./...
-```
 
-### E2E Tests (Playwright)
-
-End-to-end tests verify the web UI works correctly across browsers.
-
-```bash
-# Install dependencies
-npm install
-npx playwright install
-
-# Run tests (requires running server)
+# E2E tests (Playwright)
+npm install && npx playwright install
 ./shrinkray -media /tmp/test-media &
 npm test
-
-# Run with UI (interactive)
-npm run test:ui
-
-# Run headed (see browser)
-npm run test:headed
-
-# View test report
-npm run test:report
 ```
 
-**Test suites:**
-- `navigation.spec.ts` - Layout, navigation, keyboard access
-- `file-browser.spec.ts` - File/folder browsing
-- `presets.spec.ts` - Preset selection, help modal
-- `job-queue.spec.ts` - Job display, progress, cancellation
-- `settings.spec.ts` - Settings panel, toggles
-- `sse-streaming.spec.ts` - Real-time updates
-- `accessibility.spec.ts` - A11y checks
+---
 
-## Docker Image Publishing
+## Acknowledgments
 
-The Docker image is automatically built and published to GitHub Container Registry (GHCR) when changes are pushed to the `main` branch.
+This project is built on the excellent work of [@gwlsn](https://github.com/gwlsn) and the original [shrinkray](https://github.com/gwlsn/shrinkray) project. Thank you for creating such a useful tool and making it open source.
 
-**Image URL**: `ghcr.io/jesposito/shrinkray:latest`
+Additional contributions from [@akaBilih](https://github.com/akaBilih) for the tabbed layout feature.
 
-**Available Tags**:
-- `latest` - Always points to the most recent build from main
-- `<sha>` - Short git commit SHA for specific versions (e.g., `ghcr.io/jesposito/shrinkray:abc1234`)
+---
 
-### Making the Package Public (Required for Unraid)
+## License
 
-By default, GHCR packages are private. To allow Unraid to pull the image without authentication:
-
-1. Go to your GitHub profile → **Packages**
-2. Click on the `shrinkray` package
-3. Click **Package settings** (right sidebar)
-4. Scroll to **Danger Zone** → Click **Change visibility**
-5. Select **Public** and confirm
-
-### Unraid Setup
-
-Use this exact image name in Unraid:
-
-```
-ghcr.io/jesposito/shrinkray:latest
-```
-
-Add a new container in Unraid with:
-- **Repository**: `ghcr.io/jesposito/shrinkray:latest`
-- **WebUI**: `http://[IP]:[PORT:8080]`
-- **Port**: `8080` → `8080`
-- **Path**: `/config` → `/mnt/user/appdata/shrinkray`
-- **Path**: `/media` → `/mnt/user/` (or your media location)
-
-For hardware acceleration, add the appropriate device mapping:
-- Intel/AMD: `/dev/dri` → `/dev/dri`
-- NVIDIA: Enable `--runtime=nvidia` with the Nvidia-Driver plugin
+MIT License — see [LICENSE](LICENSE) for details.
