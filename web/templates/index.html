@@ -15,7 +15,7 @@
             --bg-tertiary: #F5F5F5;
             --text-primary: #1A1A1A;
             --text-secondary: #525252;
-            --text-tertiary: #737373;
+            --text-tertiary: #666666;
             --accent: #2563EB;
             --accent-hover: #1D4ED8;
             --accent-light: #EFF6FF;
@@ -47,7 +47,7 @@
             --bg-tertiary: #252525;
             --text-primary: #F5F5F5;
             --text-secondary: #A3A3A3;
-            --text-tertiary: #787878;
+            --text-tertiary: #8A8A8A;
             --accent: #3B82F6;
             --accent-hover: #60A5FA;
             --accent-light: #1E3A5F;
@@ -162,6 +162,19 @@
 
         .stat-item.success .stat-value { color: var(--success); }
         .stat-item.running .stat-value { color: var(--accent); }
+
+        .schedule-status {
+            font-size: 0.8125rem;
+            color: var(--text-tertiary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .schedule-status svg {
+            width: 14px;
+            height: 14px;
+        }
 
         .header-right {
             display: flex;
@@ -1463,6 +1476,108 @@
             margin-bottom: 16px;
         }
 
+        .setting-group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            padding: 4px 0;
+            margin-bottom: 12px;
+            border-radius: var(--radius-sm);
+        }
+
+        .setting-group-header:hover .setting-group-title {
+            color: var(--text-secondary);
+        }
+
+        .setting-group-header .setting-group-title {
+            margin-bottom: 0;
+        }
+
+        .setting-group-toggle {
+            width: 16px;
+            height: 16px;
+            color: var(--text-tertiary);
+            transition: transform var(--transition-fast);
+        }
+
+        .setting-group.collapsed .setting-group-toggle {
+            transform: rotate(-90deg);
+        }
+
+        .setting-group.collapsed .setting-group-content {
+            display: none;
+        }
+
+        .setting-group-content {
+            display: block;
+        }
+
+        .setting-warning {
+            font-size: 0.8125rem;
+            color: var(--warning);
+            padding: 12px;
+            background: var(--warning-light);
+            border-radius: var(--radius-sm);
+            margin-bottom: 16px;
+        }
+
+        .setting-item-stacked {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+        }
+
+        .setting-item-stacked .setting-control {
+            margin-left: 0;
+        }
+
+        .setting-slider-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .setting-slider {
+            flex: 1;
+            height: 6px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: var(--border);
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .setting-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+        }
+
+        .setting-slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            border: none;
+        }
+
+        .setting-slider-value {
+            min-width: 50px;
+            padding: 6px 10px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 0.875rem;
+            font-family: var(--font-mono);
+            text-align: center;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
         .setting-item {
             display: flex;
             justify-content: space-between;
@@ -1855,9 +1970,19 @@
             transition: border-color var(--transition-fast), background var(--transition-fast);
         }
 
-        .preset-card:hover {
+        .preset-card:hover,
+        .preset-card:focus {
             border-color: var(--accent);
             background: var(--bg-primary);
+        }
+
+        .preset-card:focus {
+            outline: none;
+        }
+
+        .preset-card:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
         }
 
         .preset-card-title {
@@ -2333,10 +2458,78 @@
             border: 0;
         }
 
-        /* Improved focus indicators */
+        /* Skip link - visible on focus for keyboard users */
+        .skip-link {
+            position: absolute;
+            top: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--accent);
+            color: white;
+            padding: 12px 24px;
+            border-radius: var(--radius-md);
+            font-weight: 600;
+            text-decoration: none;
+            z-index: 10000;
+            transition: top var(--transition-fast);
+        }
+
+        .skip-link:focus {
+            top: 16px;
+            outline: 3px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+/* Improved focus indicators */
         :focus-visible {
             outline: 2px solid var(--accent);
             outline-offset: 2px;
+        }
+
+        button:focus-visible,
+        .btn:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        /* Reduced motion support for users who prefer minimal animation */
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+            
+            .spinner {
+                animation: none;
+            }
+        }
+
+        /* Improved checkbox touch targets */
+        .setting-checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 44px;
+            min-width: 44px;
+            cursor: pointer;
+            padding: 8px;
+            margin: -8px;
+            border-radius: var(--radius-sm);
+        }
+
+        .setting-checkbox-label:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .setting-checkbox-label input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: var(--accent);
+            cursor: pointer;
         }
 
         button:focus-visible,
@@ -2382,6 +2575,9 @@
     </style>
 </head>
 <body>
+    <!-- Skip link for keyboard users -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
     <!-- Offline indicator banner -->
     <div class="offline-banner" id="offline-banner" style="display: none;" role="alert" aria-live="assertive">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -2421,6 +2617,7 @@
                         <span class="stat-value" id="stat-saved">0 MB</span>
                         <span class="stat-label">saved</span>
                     </div>
+                    <span class="schedule-status" id="schedule-status"></span>
                 </div>
             </div>
             <div class="header-right">
@@ -2458,22 +2655,22 @@
             </div>
         </header>
 
-        <main class="main">
-            <div class="tab-bar" role="tablist" aria-label="Layout tabs">
-                <button class="tab-button" type="button" data-tab="media" role="tab" aria-controls="browser-panel" aria-selected="true" onclick="setActiveTab('media')">
+        <main class="main" id="main-content">
+            <div class="tab-bar" role="tablist" aria-label="Layout tabs" onkeydown="handleTabKeydown(event)">
+                <button class="tab-button" type="button" id="tab-media" data-tab="media" role="tab" aria-controls="browser-panel" aria-selected="true" onclick="setActiveTab('media')">
                     Media / Files
                 </button>
-                <button class="tab-button" type="button" data-tab="queue" role="tab" aria-controls="queue-panel-wrapper" aria-selected="false" onclick="setActiveTab('queue')">
+                <button class="tab-button" type="button" id="tab-queue" data-tab="queue" role="tab" aria-controls="queue-panel-wrapper" aria-selected="false" onclick="setActiveTab('queue')">
                     Queue <span class="tab-badge" id="queue-tab-badge" style="display: none;"></span>
                 </button>
-                <button class="tab-button" type="button" data-tab="active" role="tab" aria-controls="active-panel" aria-selected="false" onclick="setActiveTab('active')">
+                <button class="tab-button" type="button" id="tab-active" data-tab="active" role="tab" aria-controls="active-panel" aria-selected="false" onclick="setActiveTab('active')">
                     Active <span class="tab-badge" id="active-tab-badge" style="display: none;"></span>
                 </button>
-                <button class="tab-button" type="button" data-tab="settings" role="tab" aria-controls="settings-overlay" aria-selected="false" onclick="setActiveTab('settings')">
+                <button class="tab-button" type="button" id="tab-settings" data-tab="settings" role="tab" aria-controls="settings-overlay" aria-selected="false" onclick="setActiveTab('settings')">
                     Settings
                 </button>
             </div>
-            <div class="browser-panel" id="browser-panel">
+            <div class="browser-panel" id="browser-panel" role="tabpanel" aria-labelledby="tab-media">
                 <div class="panel">
                     <div class="file-list-bar">
                         <div class="breadcrumb" id="breadcrumb">
@@ -2534,7 +2731,7 @@
                 </div>
             </div>
 
-            <div class="queue-panel" id="queue-panel-wrapper">
+            <div class="queue-panel" id="queue-panel-wrapper" role="tabpanel" aria-labelledby="tab-queue">
                 <div class="panel active-jobs-panel" id="active-panel" style="display: none;">
                     <div class="panel-header">
                         <button class="panel-toggle" type="button" onclick="togglePanel('active-panel')" aria-expanded="true" aria-controls="active-panel-content">
@@ -2647,12 +2844,12 @@
             </div>
 
             <!-- Settings Panel -->
-            <div class="settings-overlay" id="settings-overlay" onclick="closeSettings(event)">
+            <div class="settings-overlay" id="settings-overlay" role="tabpanel" aria-labelledby="tab-settings" onclick="closeSettings(event)">
         <div class="settings-panel" onclick="event.stopPropagation()">
             <div class="settings-header">
                 <span class="settings-title">Settings</span>
-                <button class="settings-close" onclick="closeSettings()">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <button class="settings-close" onclick="closeSettings()" aria-label="Close settings">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <line x1="18" y1="6" x2="6" y2="18"/>
                         <line x1="6" y1="6" x2="18" y2="18"/>
                     </svg>
@@ -2676,12 +2873,12 @@
                     <div class="setting-item">
                         <div class="setting-info">
                             <div class="setting-name">Subtitles</div>
-                            <div class="setting-desc">Handle unsupported subtitle codecs for MKV output</div>
+                            <div class="setting-desc">Handle unsupported subtitle codecs</div>
                         </div>
                         <div class="setting-control">
                             <select class="setting-select" id="setting-subtitle-handling" onchange="updateSetting('subtitle_handling', this.value)">
-                                <option value="convert">Convert mov_text to SRT</option>
-                                <option value="drop">Drop unsupported subtitles</option>
+                                <option value="convert">Convert to SRT</option>
+                                <option value="drop">Drop unsupported</option>
                             </select>
                         </div>
                     </div>
@@ -2701,25 +2898,170 @@
                             </select>
                         </div>
                     </div>
-                </div>
-                <div class="setting-group">
-                    <div class="setting-group-title">Browser</div>
                     <div class="setting-item">
                         <div class="setting-info">
-                            <div class="setting-name">Hide processing files</div>
-                            <div class="setting-desc">Hide shrinkray.tmp files from the browser</div>
+                            <div class="setting-name">CPU fallback</div>
+                            <div class="setting-desc">Retry with software encoding if GPU fails</div>
                         </div>
                         <div class="setting-control">
-                            <input type="checkbox" id="setting-hide-processing-tmp" onchange="toggleHideProcessingTmp(this.checked)" style="width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer;">
+                            <label class="setting-checkbox-label">
+                                <input type="checkbox" id="setting-allow-software-fallback" onchange="toggleAllowSoftwareFallback(this.checked)" aria-label="Allow CPU encode fallback">
+                            </label>
                         </div>
                     </div>
                 </div>
+
                 <div class="setting-group">
-                    <div class="setting-group-title">Layout</div>
+                    <div class="setting-group-title">Schedule</div>
                     <div class="setting-item">
                         <div class="setting-info">
-                            <div class="setting-name">Layout design</div>
-                            <div class="setting-desc">Choose between split panes or tabs</div>
+                            <div class="setting-name">Enable scheduling</div>
+                            <div class="setting-desc">Only transcode during set hours</div>
+                        </div>
+                        <div class="setting-control">
+                            <label class="setting-checkbox-label">
+                                <input type="checkbox" id="setting-schedule-enabled" onchange="updateScheduleSetting()" aria-label="Enable scheduling">
+                            </label>
+                        </div>
+                    </div>
+                    <div class="setting-item" id="schedule-hours-row">
+                        <div class="setting-info">
+                            <div class="setting-name">Transcode window</div>
+                            <div class="setting-desc">Start and end time</div>
+                        </div>
+                        <div class="setting-control" style="display: flex; gap: 8px; align-items: center;">
+                            <select class="setting-select" id="setting-schedule-start" style="min-width: 100px" onchange="updateScheduleSetting()" aria-label="Schedule start hour">
+                            </select>
+                            <span style="color: var(--text-secondary)">to</span>
+                            <select class="setting-select" id="setting-schedule-end" style="min-width: 100px" onchange="updateScheduleSetting()" aria-label="Schedule end hour">
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="setting-group collapsed" id="quality-settings">
+                    <div class="setting-group-header" onclick="toggleSettingGroup('quality-settings')" role="button" tabindex="0" aria-expanded="false" aria-controls="quality-settings-content" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSettingGroup('quality-settings')}">
+                        <div class="setting-group-title">Quality</div>
+                        <svg class="setting-group-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </div>
+                    <div class="setting-group-content" id="quality-settings-content">
+                        <div class="setting-warning">
+                            Lower values = higher quality but larger files. Default values work well for most content.
+                        </div>
+                        <div class="setting-item setting-item-stacked">
+                            <div class="setting-info">
+                                <div class="setting-name">HEVC Quality (CRF)</div>
+                                <div class="setting-desc">15-40, default 26</div>
+                            </div>
+                            <div class="setting-control">
+                                <div class="setting-slider-row">
+                                    <input type="range" class="setting-slider" id="setting-quality-hevc" min="15" max="40" value="26" oninput="syncQualityInput('hevc', this.value)" onchange="updateSetting('quality_hevc', parseInt(this.value))">
+                                    <input type="number" class="setting-slider-value" id="setting-quality-hevc-input" min="15" max="40" value="26" onchange="syncQualitySlider('hevc', this.value); updateSetting('quality_hevc', parseInt(this.value))" aria-label="HEVC CRF value">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="setting-item setting-item-stacked">
+                            <div class="setting-info">
+                                <div class="setting-name">AV1 Quality (CRF)</div>
+                                <div class="setting-desc">20-50, default 35</div>
+                            </div>
+                            <div class="setting-control">
+                                <div class="setting-slider-row">
+                                    <input type="range" class="setting-slider" id="setting-quality-av1" min="20" max="50" value="35" oninput="syncQualityInput('av1', this.value)" onchange="updateSetting('quality_av1', parseInt(this.value))">
+                                    <input type="number" class="setting-slider-value" id="setting-quality-av1-input" min="20" max="50" value="35" onchange="syncQualitySlider('av1', this.value); updateSetting('quality_av1', parseInt(this.value))" aria-label="AV1 CRF value">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="setting-group collapsed" id="notification-settings">
+                    <div class="setting-group-header" onclick="toggleSettingGroup('notification-settings')" role="button" tabindex="0" aria-expanded="false" aria-controls="notification-settings-content" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSettingGroup('notification-settings')}">
+                        <div class="setting-group-title">Notifications</div>
+                        <svg class="setting-group-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </div>
+                    <div class="setting-group-content" id="notification-settings-content">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <div class="setting-name">Pushover User Key</div>
+                                <div class="setting-desc">Your Pushover user/group key</div>
+                            </div>
+                            <div class="setting-control">
+                                <input type="text" class="setting-input" id="setting-pushover-user"
+                                       placeholder="Enter user key" aria-label="Pushover User Key" onchange="updateSetting('pushover_user_key', this.value)">
+                            </div>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <div class="setting-name">Pushover App Token</div>
+                                <div class="setting-desc">Your application token</div>
+                            </div>
+                            <div class="setting-control">
+                                <input type="text" class="setting-input" id="setting-pushover-token"
+                                       placeholder="Enter app token" aria-label="Pushover App Token" onchange="updateSetting('pushover_app_token', this.value)">
+                            </div>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <div class="setting-name">Test Pushover</div>
+                                <div class="setting-desc">Send a test notification</div>
+                            </div>
+                            <div class="setting-control">
+                                <button class="btn btn-secondary btn-sm" id="test-pushover-btn" onclick="testPushover()">Test</button>
+                            </div>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <div class="setting-name">ntfy Server</div>
+                                <div class="setting-desc">Server URL</div>
+                            </div>
+                            <div class="setting-control">
+                                <input type="text" class="setting-input" id="setting-ntfy-server"
+                                       placeholder="https://ntfy.sh" aria-label="ntfy Server URL" onchange="updateSetting('ntfy_server', this.value)">
+                            </div>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <div class="setting-name">ntfy Topic</div>
+                                <div class="setting-desc">Topic name</div>
+                            </div>
+                            <div class="setting-control">
+                                <input type="text" class="setting-input" id="setting-ntfy-topic"
+                                       placeholder="Enter topic" aria-label="ntfy Topic" onchange="updateSetting('ntfy_topic', this.value)">
+                            </div>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <div class="setting-name">ntfy Token</div>
+                                <div class="setting-desc">Optional access token</div>
+                            </div>
+                            <div class="setting-control">
+                                <input type="text" class="setting-input" id="setting-ntfy-token"
+                                       placeholder="Enter token" aria-label="ntfy Access Token" onchange="updateSetting('ntfy_token', this.value)">
+                            </div>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <div class="setting-name">Test ntfy</div>
+                                <div class="setting-desc">Send a test notification</div>
+                            </div>
+                            <div class="setting-control">
+                                <button class="btn btn-secondary btn-sm" id="test-ntfy-btn" onclick="testNtfy()">Test</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <div class="setting-group-title">Interface</div>
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <div class="setting-name">Layout</div>
+                            <div class="setting-desc">Split panes or tabbed view</div>
                         </div>
                         <div class="setting-control">
                             <select class="setting-select" id="setting-layout-design" onchange="updateLayoutDesign(this.value)">
@@ -2728,111 +3070,35 @@
                             </select>
                         </div>
                     </div>
-                </div>
-                <div class="setting-group">
-                    <div class="setting-group-title">Transcoding</div>
                     <div class="setting-item">
                         <div class="setting-info">
-                            <div class="setting-name">Allow CPU encode fallback</div>
-                            <div class="setting-desc">Useful if a few files won't encode on GPU</div>
+                            <div class="setting-name">Hide temp files</div>
+                            <div class="setting-desc">Hide .shrinkray.tmp in browser</div>
                         </div>
                         <div class="setting-control">
-                            <input type="checkbox" id="setting-allow-software-fallback" onchange="toggleAllowSoftwareFallback(this.checked)" style="width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer;">
+                            <label class="setting-checkbox-label">
+                                <input type="checkbox" id="setting-hide-processing-tmp" onchange="toggleHideProcessingTmp(this.checked)" aria-label="Hide processing files">
+                            </label>
                         </div>
                     </div>
-                </div>
-                <div class="setting-group">
-                    <div class="setting-group-title">History</div>
                     <div class="setting-item">
                         <div class="setting-info">
-                            <div class="setting-name">Processed videos</div>
-                            <div class="setting-desc">Clear the stored processed history used for badges</div>
+                            <div class="setting-name">Clear history</div>
+                            <div class="setting-desc">Reset processed video badges</div>
                         </div>
                         <div class="setting-control">
                             <button class="btn btn-secondary btn-sm" onclick="clearProcessedHistory()">Clear</button>
                         </div>
                     </div>
-                </div>
-                <div class="setting-group">
-                    <div class="setting-group-title">Notifications</div>
                     <div class="setting-item">
                         <div class="setting-info">
-                            <div class="setting-name">Pushover User Key</div>
-                            <div class="setting-desc">Your Pushover user/group key</div>
+                            <div class="setting-name">Unicorn Mode</div>
+                            <div class="setting-desc">Cosmetic sparkles</div>
                         </div>
                         <div class="setting-control">
-                            <input type="text" class="setting-input" id="setting-pushover-user"
-                                   placeholder="Enter user key" onchange="updateSetting('pushover_user_key', this.value)">
-                        </div>
-                    </div>
-                    <div class="setting-item">
-                        <div class="setting-info">
-                            <div class="setting-name">Pushover App Token</div>
-                            <div class="setting-desc">Your Pushover application token</div>
-                        </div>
-                        <div class="setting-control">
-                            <input type="text" class="setting-input" id="setting-pushover-token"
-                                   placeholder="Enter app token" onchange="updateSetting('pushover_app_token', this.value)">
-                        </div>
-                    </div>
-                    <div class="setting-item">
-                        <div class="setting-info">
-                            <div class="setting-name">Test Notification</div>
-                            <div class="setting-desc">Send a test to verify setup</div>
-                        </div>
-                        <div class="setting-control">
-                            <button class="btn btn-secondary btn-sm" id="test-pushover-btn" onclick="testPushover()">Test</button>
-                        </div>
-                    </div>
-                    <div class="setting-item">
-                        <div class="setting-info">
-                            <div class="setting-name">ntfy Server</div>
-                            <div class="setting-desc">Server URL (default: https://ntfy.sh)</div>
-                        </div>
-                        <div class="setting-control">
-                            <input type="text" class="setting-input" id="setting-ntfy-server"
-                                   placeholder="https://ntfy.sh" onchange="updateSetting('ntfy_server', this.value)">
-                        </div>
-                    </div>
-                    <div class="setting-item">
-                        <div class="setting-info">
-                            <div class="setting-name">ntfy Topic</div>
-                            <div class="setting-desc">Topic name for notifications</div>
-                        </div>
-                        <div class="setting-control">
-                            <input type="text" class="setting-input" id="setting-ntfy-topic"
-                                   placeholder="Enter topic" onchange="updateSetting('ntfy_topic', this.value)">
-                        </div>
-                    </div>
-                    <div class="setting-item">
-                        <div class="setting-info">
-                            <div class="setting-name">ntfy Token</div>
-                            <div class="setting-desc">Optional access token</div>
-                        </div>
-                        <div class="setting-control">
-                            <input type="text" class="setting-input" id="setting-ntfy-token"
-                                   placeholder="Enter token (optional)" onchange="updateSetting('ntfy_token', this.value)">
-                        </div>
-                    </div>
-                    <div class="setting-item">
-                        <div class="setting-info">
-                            <div class="setting-name">Test ntfy</div>
-                            <div class="setting-desc">Send a test to verify setup</div>
-                        </div>
-                        <div class="setting-control">
-                            <button class="btn btn-secondary btn-sm" id="test-ntfy-btn" onclick="testNtfy()">Test</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="setting-group">
-                    <div class="setting-group-title">Fun</div>
-                    <div class="setting-item">
-                        <div class="setting-info">
-                            <div class="setting-name">🦄 Unicorn Mode</div>
-                            <div class="setting-desc">Purely cosmetic sparkles (easy to remove)</div>
-                        </div>
-                        <div class="setting-control">
-                            <input type="checkbox" id="setting-unicorn-mode" onchange="toggleUnicornMode(this.checked)" style="width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer;">
+                            <label class="setting-checkbox-label">
+                                <input type="checkbox" id="setting-unicorn-mode" onchange="toggleUnicornMode(this.checked)" aria-label="Enable Unicorn Mode">
+                            </label>
                         </div>
                     </div>
                 </div>
@@ -2844,8 +3110,7 @@
         </main>
     </div>
 
-    <!-- Confirm Modal -->
-    <div id="confirm-modal" class="modal-overlay" onclick="closeConfirmModal(event)">
+    <div id="confirm-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title" onclick="closeConfirmModal(event)">
         <div class="modal" onclick="event.stopPropagation()">
             <div class="modal-title" id="confirm-modal-title">Confirm</div>
             <div class="modal-message" id="confirm-modal-message"></div>
@@ -2862,8 +3127,7 @@
         </div>
     </div>
 
-    <!-- Video Info Modal -->
-    <div id="video-info-modal" class="modal-overlay" onclick="closeVideoInfoModal(event)">
+    <div id="video-info-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="video-info-title" onclick="closeVideoInfoModal(event)">
         <div class="modal" onclick="event.stopPropagation()">
             <div class="modal-title" id="video-info-title">Video info</div>
             <div class="video-info-body" id="video-info-body"></div>
@@ -2873,15 +3137,14 @@
         </div>
     </div>
 
-    <!-- Preset Picker Modal -->
-    <div id="preset-modal" class="modal-overlay" onclick="closePresetModal(event)">
+    <div id="preset-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="preset-modal-title" onclick="closePresetModal(event)">
         <div class="modal preset-modal" onclick="event.stopPropagation()">
             <div class="modal-header">
-                <div class="modal-title">Choose a preset</div>
-                <button class="modal-close" onclick="closePresetModal()">&times;</button>
+                <div class="modal-title" id="preset-modal-title">Choose a preset</div>
+                <button class="modal-close" onclick="closePresetModal()" aria-label="Close preset picker">&times;</button>
             </div>
-            <div class="preset-cards">
-                <div class="preset-card" onclick="selectPresetFromModal('compress-av1')">
+            <div class="preset-cards" role="group" aria-label="Available presets">
+                <div class="preset-card" role="button" tabindex="0" onclick="selectPresetFromModal('compress-av1')" onkeydown="handlePresetCardKeydown(event, 'compress-av1')">
                     <div class="preset-card-title">Smaller files, best quality</div>
                     <ul class="preset-card-bullets">
                         <li>Smallest files</li>
@@ -2890,7 +3153,7 @@
                     </ul>
                     <div class="preset-card-codec">Uses: AV1</div>
                 </div>
-                <div class="preset-card" onclick="selectPresetFromModal('compress-hevc')">
+                <div class="preset-card" role="button" tabindex="0" onclick="selectPresetFromModal('compress-hevc')" onkeydown="handlePresetCardKeydown(event, 'compress-hevc')">
                     <div class="preset-card-title">Smaller files, works almost everywhere</div>
                     <ul class="preset-card-bullets">
                         <li>Excellent quality</li>
@@ -2898,7 +3161,7 @@
                     </ul>
                     <div class="preset-card-codec">Uses: HEVC (H.265)</div>
                 </div>
-                <div class="preset-card" onclick="selectPresetFromModal('1080p')">
+                <div class="preset-card" role="button" tabindex="0" onclick="selectPresetFromModal('1080p')" onkeydown="handlePresetCardKeydown(event, '1080p')">
                     <div class="preset-card-title">Make it 1080p</div>
                     <ul class="preset-card-bullets">
                         <li>Downscale to Full HD</li>
@@ -2906,7 +3169,7 @@
                     </ul>
                     <div class="preset-card-codec">Uses: HEVC</div>
                 </div>
-                <div class="preset-card" onclick="selectPresetFromModal('720p')">
+                <div class="preset-card" role="button" tabindex="0" onclick="selectPresetFromModal('720p')" onkeydown="handlePresetCardKeydown(event, '720p')">
                     <div class="preset-card-title">Make it 720p</div>
                     <ul class="preset-card-bullets">
                         <li>Maximum compatibility</li>
@@ -4009,7 +4272,9 @@
         async function browse(path = '', preserveSelections = false, options = {}) {
             const { updateHistory = true, replaceHistory = false, retryCount = 0 } = options;
             const maxRetries = 3;
-            const retryDelays = [1000, 2000, 4000]; // Exponential backoff
+            const retryDelays = [1000, 2000, 4000];
+            
+            announceToSR('Loading files');
 
             try {
                 const url = path ? `/api/browse?path=${encodeURIComponent(path)}` : '/api/browse';
@@ -4062,10 +4327,13 @@
                 }
                 breadcrumb.innerHTML = crumbs;
 
-                // Update file list
                 fileListEntries = data.entries || [];
                 updateEmptyFolderToggleVisibility();
                 renderFileList();
+                
+                const fileCount = (data.entries || []).filter(e => !e.is_dir).length;
+                const folderCount = (data.entries || []).filter(e => e.is_dir).length;
+                announceToSR(`Loaded ${fileCount} files and ${folderCount} folders`);
 
             } catch (err) {
                 console.error('Browse error:', err);
@@ -4347,28 +4615,39 @@
                     </div>
                 </div>
             `;
+            previouslyFocusedElement = document.activeElement;
             document.getElementById('video-info-title').textContent = entry.name || 'Video info';
             document.getElementById('video-info-body').innerHTML = infoHtml;
-            document.getElementById('video-info-modal').classList.add('active');
+            const modal = document.getElementById('video-info-modal');
+            modal.classList.add('active');
+            trapFocusInModal(modal);
+            announceToSR(`Video info for ${entry.name || 'file'}`);
         }
 
         function closeVideoInfoModal(event) {
             if (event && event.currentTarget && event.currentTarget.id === 'video-info-modal' && event.target !== event.currentTarget) {
                 return;
             }
-            document.getElementById('video-info-modal').classList.remove('active');
+            const modal = document.getElementById('video-info-modal');
+            modal.classList.remove('active');
+            releaseFocusTrap(modal);
         }
 
-        // Preset picker modal functions
         function openPresetModal() {
-            document.getElementById('preset-modal').classList.add('active');
+            previouslyFocusedElement = document.activeElement;
+            const modal = document.getElementById('preset-modal');
+            modal.classList.add('active');
+            trapFocusInModal(modal);
+            announceToSR('Choose a preset');
         }
 
         function closePresetModal(event) {
             if (event && event.currentTarget && event.currentTarget.id === 'preset-modal' && event.target !== event.currentTarget) {
                 return;
             }
-            document.getElementById('preset-modal').classList.remove('active');
+            const modal = document.getElementById('preset-modal');
+            modal.classList.remove('active');
+            releaseFocusTrap(modal);
         }
 
         function selectPresetFromModal(presetId) {
@@ -4378,13 +4657,20 @@
                 onPresetChange();
             }
             closePresetModal();
+            announceToSR(`Selected ${presetId} preset`);
         }
 
-        // Close preset modal on ESC key
         document.addEventListener('keydown', function(event) {
             if (event.key === 'Escape') {
+                const confirmModal = document.getElementById('confirm-modal');
+                const videoInfoModal = document.getElementById('video-info-modal');
                 const presetModal = document.getElementById('preset-modal');
-                if (presetModal && presetModal.classList.contains('active')) {
+                
+                if (confirmModal && confirmModal.classList.contains('active')) {
+                    closeConfirmModal();
+                } else if (videoInfoModal && videoInfoModal.classList.contains('active')) {
+                    closeVideoInfoModal();
+                } else if (presetModal && presetModal.classList.contains('active')) {
                     closePresetModal();
                 }
             }
@@ -4645,6 +4931,7 @@
         let confirmCancelCallback = null;
 
         function showConfirmModal(title, message, onConfirm, options = {}) {
+            previouslyFocusedElement = document.activeElement;
             document.getElementById('confirm-modal-title').textContent = title;
             document.getElementById('confirm-modal-message').textContent = message;
             confirmCallback = onConfirm;
@@ -4668,7 +4955,10 @@
                 optionsEl.style.display = 'none';
                 removeCompletedEl.checked = true;
             }
-            document.getElementById('confirm-modal').classList.add('active');
+            const modal = document.getElementById('confirm-modal');
+            modal.classList.add('active');
+            trapFocusInModal(modal);
+            announceToSR(title);
         }
 
         function confirmModalChoice(title, message, options = {}) {
@@ -4686,12 +4976,13 @@
         }
 
         function closeConfirmModal(event) {
-            // If called from overlay click, only close if clicking the overlay itself
             if (event && event.target !== event.currentTarget) return;
             if (event && event.target === event.currentTarget && confirmCancelCallback) {
                 confirmCancelCallback();
             }
-            document.getElementById('confirm-modal').classList.remove('active');
+            const modal = document.getElementById('confirm-modal');
+            modal.classList.remove('active');
+            releaseFocusTrap(modal);
             confirmCallback = null;
             confirmCancelCallback = null;
         }
@@ -5953,9 +6244,120 @@
             const el = document.getElementById('sr-announcements');
             if (el) {
                 el.textContent = message;
-                // Clear after announcement
                 setTimeout(() => { el.textContent = ''; }, 1000);
             }
+        }
+
+        // Modal focus management
+        let previouslyFocusedElement = null;
+        
+        function trapFocusInModal(modalElement) {
+            const focusableSelectors = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+            const focusableElements = Array.from(modalElement.querySelectorAll(focusableSelectors));
+            
+            if (focusableElements.length === 0) {
+                modalElement.setAttribute('tabindex', '-1');
+                modalElement.focus();
+                return;
+            }
+            
+            const firstFocusable = focusableElements[0];
+            const lastFocusable = focusableElements[focusableElements.length - 1];
+            
+            function handleTabKey(e) {
+                if (e.key !== 'Tab') return;
+                
+                if (e.shiftKey) {
+                    if (document.activeElement === firstFocusable) {
+                        e.preventDefault();
+                        lastFocusable.focus();
+                    }
+                } else {
+                    if (document.activeElement === lastFocusable) {
+                        e.preventDefault();
+                        firstFocusable.focus();
+                    }
+                }
+            }
+            
+            modalElement._focusTrapHandler = handleTabKey;
+            modalElement.addEventListener('keydown', handleTabKey);
+            
+            const appContainer = document.querySelector('.app');
+            if (appContainer) {
+                appContainer.setAttribute('inert', '');
+            }
+            
+            firstFocusable.focus();
+        }
+        
+        function releaseFocusTrap(modalElement) {
+            if (modalElement._focusTrapHandler) {
+                modalElement.removeEventListener('keydown', modalElement._focusTrapHandler);
+                delete modalElement._focusTrapHandler;
+            }
+            
+            const appContainer = document.querySelector('.app');
+            if (appContainer) {
+                appContainer.removeAttribute('inert');
+            }
+            
+            if (previouslyFocusedElement && previouslyFocusedElement.focus) {
+                try {
+                    if (document.body.contains(previouslyFocusedElement)) {
+                        previouslyFocusedElement.focus();
+                    }
+                } catch (e) {}
+                previouslyFocusedElement = null;
+            }
+        }
+
+        function handlePresetCardKeydown(event, presetId) {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                selectPresetFromModal(presetId);
+            } else if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+                event.preventDefault();
+                const cards = Array.from(document.querySelectorAll('.preset-card'));
+                const currentIndex = cards.indexOf(event.target);
+                const nextIndex = (currentIndex + 1) % cards.length;
+                cards[nextIndex].focus();
+            } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+                event.preventDefault();
+                const cards = Array.from(document.querySelectorAll('.preset-card'));
+                const currentIndex = cards.indexOf(event.target);
+                const prevIndex = (currentIndex - 1 + cards.length) % cards.length;
+                cards[prevIndex].focus();
+            }
+        }
+
+        function handleTabKeydown(event) {
+            const tabs = ['media', 'queue', 'active', 'settings'];
+            const currentTab = document.querySelector('.tab-button[aria-selected="true"]');
+            if (!currentTab) return;
+            
+            const currentIndex = tabs.indexOf(currentTab.dataset.tab);
+            let newIndex = currentIndex;
+            
+            if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+                event.preventDefault();
+                newIndex = (currentIndex + 1) % tabs.length;
+            } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                newIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+            } else if (event.key === 'Home') {
+                event.preventDefault();
+                newIndex = 0;
+            } else if (event.key === 'End') {
+                event.preventDefault();
+                newIndex = tabs.length - 1;
+            } else {
+                return;
+            }
+            
+            const newTab = tabs[newIndex];
+            setActiveTab(newTab);
+            document.getElementById(`tab-${newTab}`).focus();
         }
 
         // Update queue count badge
@@ -6034,47 +6436,6 @@
             }
         }
 
-        function setActiveTab(tab) {
-            if (document.body.dataset.layout !== 'tabs') {
-                return;
-            }
-            activeTab = tab;
-            document.body.dataset.activeTab = tab;
-            localStorage.setItem(storageKeys.activeTab, tab);
-            const buttons = document.querySelectorAll('.tab-button');
-            buttons.forEach((button) => {
-                const isActive = button.dataset.tab === tab;
-                button.setAttribute('aria-selected', isActive ? 'true' : 'false');
-                button.setAttribute('tabindex', isActive ? '0' : '-1');
-            });
-            const settingsOverlay = document.getElementById('settings-overlay');
-            if (settingsOverlay) {
-                if (tab === 'settings') {
-                    settingsOverlay.classList.add('open');
-                } else {
-                    settingsOverlay.classList.remove('open');
-                }
-            }
-        }
-
-        function applyLayoutDesign(design) {
-            const normalized = design === 'tabs' ? 'tabs' : 'split';
-            currentLayout = normalized;
-            document.body.dataset.layout = normalized;
-            if (normalized === 'tabs') {
-                if (!activeTab) {
-                    activeTab = 'media';
-                }
-                setActiveTab(activeTab);
-            } else {
-                document.body.removeAttribute('data-active-tab');
-                const settingsOverlay = document.getElementById('settings-overlay');
-                if (settingsOverlay) {
-                    settingsOverlay.classList.remove('open');
-                }
-            }
-        }
-
         // Settings
         function openSettings() {
             if (document.body.dataset.layout === 'tabs') {
@@ -6097,12 +6458,117 @@
             window.location.href = '/auth/logout';
         }
 
+        // Schedule helper functions
+        function formatHour(hour) {
+            if (hour === 0) return '12 AM';
+            if (hour === 12) return '12 PM';
+            if (hour < 12) return hour + ' AM';
+            return (hour - 12) + ' PM';
+        }
+
+        function populateHourDropdowns() {
+            const startSelect = document.getElementById('setting-schedule-start');
+            const endSelect = document.getElementById('setting-schedule-end');
+            if (!startSelect || !endSelect) return;
+            let options = '';
+            for (let h = 0; h < 24; h++) {
+                options += `<option value="${h}">${formatHour(h)}</option>`;
+            }
+            startSelect.innerHTML = options;
+            endSelect.innerHTML = options;
+        }
+
+        function updateScheduleHoursVisibility() {
+            const enabled = document.getElementById('setting-schedule-enabled').checked;
+            const hoursRow = document.getElementById('schedule-hours-row');
+            if (hoursRow) {
+                hoursRow.style.opacity = enabled ? '1' : '0.5';
+                hoursRow.style.pointerEvents = enabled ? 'auto' : 'none';
+            }
+        }
+
+        function updateScheduleStatusDisplay(enabled, startHour, endHour) {
+            const statusEl = document.getElementById('schedule-status');
+            if (!statusEl) return;
+            if (!enabled) {
+                statusEl.innerHTML = '';
+                return;
+            }
+            const clockIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+            statusEl.innerHTML = `${clockIcon} ${formatHour(startHour)} – ${formatHour(endHour)}`;
+        }
+
+        async function updateScheduleSetting() {
+            const enabled = document.getElementById('setting-schedule-enabled').checked;
+            const startHour = parseInt(document.getElementById('setting-schedule-start').value);
+            const endHour = parseInt(document.getElementById('setting-schedule-end').value);
+
+            updateScheduleHoursVisibility();
+            updateScheduleStatusDisplay(enabled, startHour, endHour);
+
+            const statusEl = document.getElementById('settings-status');
+            try {
+                const resp = await fetch('/api/config', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        schedule_enabled: enabled,
+                        schedule_start_hour: startHour,
+                        schedule_end_hour: endHour
+                    })
+                });
+
+                if (!resp.ok) {
+                    const data = await resp.json();
+                    throw new Error(data.error || 'Failed to update');
+                }
+
+                statusEl.textContent = 'Settings saved';
+                statusEl.className = 'settings-status';
+                setTimeout(() => { statusEl.textContent = ''; }, 2000);
+            } catch (err) {
+                statusEl.textContent = `Error: ${err.message}`;
+                statusEl.className = 'settings-status error';
+            }
+        }
+
+        // Quality slider sync
+        function syncQualityInput(codec, value) {
+            const input = document.getElementById(`setting-quality-${codec}-input`);
+            if (input) input.value = value;
+        }
+
+        function syncQualitySlider(codec, value) {
+            const slider = document.getElementById(`setting-quality-${codec}`);
+            const input = document.getElementById(`setting-quality-${codec}-input`);
+            if (!slider || !input) return;
+            const min = parseInt(slider.min);
+            const max = parseInt(slider.max);
+            let val = parseInt(value) || min;
+            if (val < min) val = min;
+            if (val > max) val = max;
+            slider.value = val;
+            input.value = val;
+        }
+
+        // Collapsible setting groups
+        function toggleSettingGroup(groupId) {
+            const group = document.getElementById(groupId);
+            if (!group) return;
+            const isCollapsed = group.classList.toggle('collapsed');
+            const header = group.querySelector('.setting-group-header');
+            if (header) {
+                header.setAttribute('aria-expanded', !isCollapsed);
+            }
+        }
+
         async function loadSettings() {
+            populateHourDropdowns();
+            
             try {
                 const resp = await fetch('/api/config');
                 const config = await resp.json();
 
-                // Display version
                 if (config.version) {
                     document.getElementById('app-version').textContent = config.version;
                 }
@@ -6131,6 +6597,23 @@
                 document.getElementById('setting-hide-processing-tmp').checked = config.hide_processing_tmp || false;
                 document.getElementById('setting-allow-software-fallback').checked = config.allow_software_fallback || false;
 
+                // Schedule settings
+                document.getElementById('setting-schedule-enabled').checked = config.schedule_enabled || false;
+                document.getElementById('setting-schedule-start').value = config.schedule_start_hour ?? 22;
+                document.getElementById('setting-schedule-end').value = config.schedule_end_hour ?? 6;
+                updateScheduleHoursVisibility();
+                updateScheduleStatusDisplay(config.schedule_enabled, config.schedule_start_hour ?? 22, config.schedule_end_hour ?? 6);
+
+                // Quality settings
+                const defaultHEVC = 26;
+                const defaultAV1 = 35;
+                const hevcQuality = config.quality_hevc || defaultHEVC;
+                const av1Quality = config.quality_av1 || defaultAV1;
+                document.getElementById('setting-quality-hevc').value = hevcQuality;
+                document.getElementById('setting-quality-hevc-input').value = hevcQuality;
+                document.getElementById('setting-quality-av1').value = av1Quality;
+                document.getElementById('setting-quality-av1-input').value = av1Quality;
+
                 // Show/hide notify checkbox based on whether any provider is configured
                 const notifyContainer = document.getElementById('notify-container');
                 const notifyCheckbox = document.getElementById('notify-checkbox');
@@ -6146,12 +6629,12 @@
                     notifyContainer.style.display = 'none';
                 }
 
-                // 🦄 Unicorn Mode (stored locally, not in config)
+                // Unicorn Mode (stored locally)
                 const unicornEnabled = localStorage.getItem('shrinkray-unicorn') === 'true';
                 document.getElementById('setting-unicorn-mode').checked = unicornEnabled;
                 updateStartButtonText();
 
-                // Feature flags - initialize virtual scrolling if enabled
+                // Feature flags
                 if (config.features) {
                     if (config.features.virtual_scroll && !virtualScrollEnabled) {
                         virtualScrollEnabled = true;
