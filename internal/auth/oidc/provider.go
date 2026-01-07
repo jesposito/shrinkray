@@ -486,6 +486,13 @@ func isSecureRequest(r *http.Request) bool {
 	return r.TLS != nil
 }
 
+func stateCookieSameSite(r *http.Request) http.SameSite {
+	if isSecureRequest(r) {
+		return http.SameSiteNoneMode
+	}
+	return http.SameSiteLaxMode
+}
+
 func clearStateCookie(w http.ResponseWriter, r *http.Request, name string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     name,
