@@ -246,6 +246,10 @@
             border-radius: var(--radius-md);
             cursor: pointer;
             transition: all var(--transition-fast);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
             text-align: center;
         }
 
@@ -2302,6 +2306,20 @@
             margin-left: 8px;
         }
 
+        .tab-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--accent);
+            color: white;
+            font-size: 0.7rem;
+            font-weight: 600;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 6px;
+            border-radius: 9px;
+        }
+
         /* Screen reader only */
         .sr-only {
             position: absolute;
@@ -2446,10 +2464,10 @@
                     Media / Files
                 </button>
                 <button class="tab-button" type="button" data-tab="queue" role="tab" aria-controls="queue-panel-wrapper" aria-selected="false" onclick="setActiveTab('queue')">
-                    Queue
+                    Queue <span class="tab-badge" id="queue-tab-badge" style="display: none;"></span>
                 </button>
                 <button class="tab-button" type="button" data-tab="active" role="tab" aria-controls="active-panel" aria-selected="false" onclick="setActiveTab('active')">
-                    Active
+                    Active <span class="tab-badge" id="active-tab-badge" style="display: none;"></span>
                 </button>
                 <button class="tab-button" type="button" data-tab="settings" role="tab" aria-controls="settings-overlay" aria-selected="false" onclick="setActiveTab('settings')">
                     Settings
@@ -5133,6 +5151,7 @@
             // Update queue count badge (pending + running)
             const queueCount = totalPending + (stats.running || 0);
             updateQueueCountBadge(queueCount);
+            updateActiveTabBadge(stats.running || 0);
         }
 
         // ========================================
@@ -5926,6 +5945,27 @@
         // Update queue count badge
         function updateQueueCountBadge(count) {
             const badge = document.getElementById('queue-count-badge');
+            if (badge) {
+                if (count > 0) {
+                    badge.textContent = count;
+                    badge.style.display = 'inline-flex';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
+            const tabBadge = document.getElementById('queue-tab-badge');
+            if (tabBadge) {
+                if (count > 0) {
+                    tabBadge.textContent = count;
+                    tabBadge.style.display = 'inline-flex';
+                } else {
+                    tabBadge.style.display = 'none';
+                }
+            }
+        }
+
+        function updateActiveTabBadge(count) {
+            const badge = document.getElementById('active-tab-badge');
             if (badge) {
                 if (count > 0) {
                     badge.textContent = count;
