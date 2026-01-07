@@ -98,6 +98,9 @@ type Config struct {
 	// When enabled, Shrinkray will retry failed GPU encodes using CPU, which is slower but may succeed.
 	AllowSoftwareFallback bool `yaml:"allow_software_fallback"`
 
+	// Layout controls the UI layout style ("classic" or "tabs").
+	Layout string `yaml:"layout"`
+
 	// Features contains feature flags for phased rollout of new functionality
 	Features FeatureFlags `yaml:"features"`
 
@@ -159,6 +162,7 @@ func DefaultConfig() *Config {
 		FFprobePath:      "ffprobe",
 		QueueFile:        "",
 		NtfyServer:       "https://ntfy.sh",
+		Layout:           "classic",
 		Features:         DefaultFeatureFlags(),
 		Auth: AuthConfig{
 			Enabled:  false,
@@ -204,6 +208,11 @@ func Load(path string) (*Config, error) {
 		cfg.SubtitleHandling = "convert"
 	} else if cfg.SubtitleHandling != "convert" && cfg.SubtitleHandling != "drop" {
 		cfg.SubtitleHandling = "convert"
+	}
+	if cfg.Layout == "" {
+		cfg.Layout = "classic"
+	} else if cfg.Layout != "classic" && cfg.Layout != "tabs" {
+		cfg.Layout = "classic"
 	}
 
 	// Apply environment variable overrides for feature flags
