@@ -3257,6 +3257,9 @@
         let preferredPresetId = localStorage.getItem(storageKeys.selectedPreset) || '';
         let eventSource = null;
         let cachedJobs = [];
+        const jobStartTimes = new Map();
+        const jobPauseStartedAt = new Map();
+        const jobPausedTotalMs = new Map();
 
         // Performance: Debounce refresh calls to avoid DOM thrashing
         let refreshDebounceTimer = null;
@@ -3963,7 +3966,7 @@
             if (!value) return null;
             const parsed = new Date(value);
             const ms = parsed.getTime();
-            if (Number.isNaN(ms)) return null;
+            if (Number.isNaN(ms) || ms <= 0) return null;
             return ms;
         }
 
@@ -3975,45 +3978,69 @@
         }
 
         function ensureLocalStartedAt(job, startedMs) {
-            if (!job || job.status !== 'running') return;
-            if (job.local_started_at) return;
+            if (!job) return;
+            if (job.id && jobStartTimes.has(job.id)) {
+                if (!job.local_started_at) {
+                    job.local_started_at = jobStartTimes.get(job.id);
+                }
+                return;
+            }
+            if (job.local_started_at) {
+                if (job.id) {
+                    jobStartTimes.set(job.id, job.local_started_at);
+                }
+                return;
+            }
             const now = Date.now();
             if (startedMs === null || startedMs > now + 1000) {
                 job.local_started_at = now;
+                if (job.id) {
+                    jobStartTimes.set(job.id, job.local_started_at);
+                }
+                return;
+            }
+            job.local_started_at = startedMs;
+            if (job.id) {
+                jobStartTimes.set(job.id, job.local_started_at);
             }
         }
 
         function getElapsedSeconds(job) {
             if (!job) return null;
-            if (job.status === 'complete' && job.transcode_secs) {
-                return job.transcode_secs;
-            }
             const startedMs = getStartedAtMs(job);
             ensureLocalStartedAt(job, startedMs);
-            if (startedMs === null) {
-                if (job.local_started_at) {
-                    return Math.max(0, Math.floor((Date.now() - job.local_started_at) / 1000));
-                }
-                return null;
+            const startTime = job.local_started_at ?? jobStartTimes.get(job.id) ?? startedMs;
+            if (startTime === null || startTime === undefined) {
+                return job.transcode_secs || null;
             }
             let endTime = Date.now();
-            if (job.completed_at) {
-                const completed = new Date(job.completed_at);
-                if (!Number.isNaN(completed.getTime())) {
-                    endTime = completed.getTime();
-                }
+            const completedMs = getJobTimeMs(job.completed_at);
+            if (completedMs !== null) {
+                endTime = completedMs;
             }
-            if (job.local_started_at && startedMs > endTime) {
+            const pausedAt = jobPauseStartedAt.get(job.id);
+            if (pausedAt) {
+                endTime = pausedAt;
+            }
+            if (job.local_started_at && startedMs !== null && startedMs > endTime) {
                 return Math.max(0, Math.floor((endTime - job.local_started_at) / 1000));
             }
-            const elapsedSeconds = Math.max(0, Math.floor((endTime - startedMs) / 1000));
-            return elapsedSeconds;
+            const pausedTotal = jobPausedTotalMs.get(job.id) || 0;
+            const elapsedMs = Math.max(0, endTime - startTime - pausedTotal);
+            return Math.max(0, Math.floor(elapsedMs / 1000));
         }
 
         function formatElapsed(job) {
             const seconds = getElapsedSeconds(job);
             if (seconds === null) return null;
             return formatDuration(seconds);
+        }
+
+        function renderStartingDetails(elapsed) {
+            return `
+                <span class="job-detail">Starting encoder...</span>
+                ${elapsed ? `<span class="job-detail">Elapsed: <span class="job-detail-value" data-role="elapsed">${elapsed}</span></span>` : ''}
+            `;
         }
 
         function renderRunningDetails(progress, speed, etaValue, elapsed) {
@@ -4065,14 +4092,23 @@
                 const elapsed = formatElapsed(job);
                 if (!elapsed) continue;
                 const safeId = escapeCssSelector(job.id);
-                const elapsedSelectors = [
-                    `#now-processing-content .active-job-item[data-job-id="${safeId}"] [data-role="elapsed"]`,
-                    `#queue-list .job-item[data-job-id="${safeId}"] [data-role="elapsed"]`,
+                const jobContainers = [
+                    `#now-processing-content .active-job-item[data-job-id="${safeId}"]`,
+                    `#queue-list .job-item[data-job-id="${safeId}"]`,
                 ];
-                for (const selector of elapsedSelectors) {
-                    const elapsedEl = document.querySelector(selector);
+                for (const selector of jobContainers) {
+                    const jobEl = document.querySelector(selector);
+                    if (!jobEl) continue;
+                    const detailsEl = jobEl.querySelector('.job-details');
+                    if (!detailsEl) continue;
+                    const elapsedEl = detailsEl.querySelector('[data-role="elapsed"]');
                     if (elapsedEl) {
                         elapsedEl.textContent = elapsed;
+                    } else {
+                        detailsEl.insertAdjacentHTML(
+                            'beforeend',
+                            `<span class="job-detail">Elapsed: <span class="job-detail-value" data-role="elapsed">${elapsed}</span></span>`
+                        );
                     }
                 }
             }
@@ -4805,9 +4841,18 @@
                 if (resp.ok) {
                     if (isPaused) {
                         pausedJobs.delete(id);
+                        const pausedAt = jobPauseStartedAt.get(id);
+                        if (pausedAt) {
+                            const totalPaused = jobPausedTotalMs.get(id) || 0;
+                            jobPausedTotalMs.set(id, totalPaused + (Date.now() - pausedAt));
+                            jobPauseStartedAt.delete(id);
+                        }
                         announceToSR('Job resumed');
                     } else {
                         pausedJobs.add(id);
+                        if (!jobPauseStartedAt.has(id)) {
+                            jobPauseStartedAt.set(id, Date.now());
+                        }
                         announceToSR('Job paused');
                     }
                     updatePauseButton(id);
@@ -5095,7 +5140,7 @@
             } else if (job.status === 'running') {
                 const elapsed = formatElapsed(job);
                 if (isInitializing) {
-                    detailsHtml = '<span class="job-detail">Starting encoder...</span>';
+                    detailsHtml = renderStartingDetails(elapsed);
                 } else {
                     detailsHtml = renderRunningDetails(job.progress, job.speed, job.eta || '...', elapsed);
                 }
@@ -5319,6 +5364,10 @@
                 updateStats(cachedStats);
             }
 
+            jobStartTimes.delete(job.id);
+            jobPauseStartedAt.delete(job.id);
+            jobPausedTotalMs.delete(job.id);
+            pausedJobs.delete(job.id);
             errorHelperExpanded.delete(job.id);
             errorRawExpanded.delete(job.id);
 
@@ -5862,16 +5911,16 @@
                     const safeFilename = escapeHtml(filename);
 
                     let detailsHtml = '';
-                    if (isInitializing) {
-                        detailsHtml = '<span class="job-detail">Starting encoder...</span>';
-                    } else {
-                        detailsHtml = renderRunningDetails(
-                            job.progress,
-                            job.speed,
-                            escapeHtml(job.eta) || '...',
-                            elapsed
-                        );
-                    }
+                if (isInitializing) {
+                    detailsHtml = renderStartingDetails(elapsed);
+                } else {
+                    detailsHtml = renderRunningDetails(
+                        job.progress,
+                        job.speed,
+                        escapeHtml(job.eta) || '...',
+                        elapsed
+                    );
+                }
 
                     return `
                         <div class="job-item active-job-item" data-job-id="${safeId}">
@@ -5975,7 +6024,7 @@
             const activeDetails = activeJobEl.querySelector('.job-details');
             if (activeDetails) {
                 if (isInitializing) {
-                    activeDetails.innerHTML = '<span class="job-detail">Starting encoder...</span>';
+                    activeDetails.innerHTML = renderStartingDetails(elapsed);
                 } else {
                     updateRunningDetails(activeDetails, jobData.progress, jobData.speed, safeEta, elapsed);
                 }
@@ -6004,7 +6053,7 @@
             const detailsEl = queueRow.querySelector('.job-details');
             if (detailsEl) {
                 if (isInitializing) {
-                    detailsEl.innerHTML = '<span class="job-detail">Starting encoder...</span>';
+                    detailsEl.innerHTML = renderStartingDetails(elapsed);
                 } else {
                     updateRunningDetails(detailsEl, jobData.progress, jobData.speed, safeEta, elapsed);
                 }
@@ -6098,7 +6147,7 @@
             const activeDetails = activeJobEl.querySelector('.job-details');
             if (activeDetails) {
                 if (isInitializing) {
-                    activeDetails.innerHTML = '<span class="job-detail">Starting encoder...</span>';
+                    activeDetails.innerHTML = renderStartingDetails(elapsed);
                 } else {
                     updateRunningDetails(activeDetails, progress, speed, safeEta, elapsed);
                 }
@@ -6125,7 +6174,7 @@
             const detailsEl = queueRow.querySelector('.job-details');
             if (detailsEl) {
                 if (isInitializing) {
-                    detailsEl.innerHTML = '<span class="job-detail">Starting encoder...</span>';
+                    detailsEl.innerHTML = renderStartingDetails(elapsed);
                 } else {
                     updateRunningDetails(detailsEl, progress, speed, safeEta, elapsed);
                 }

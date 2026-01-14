@@ -333,7 +333,17 @@ npm test
 
 This project is built on the excellent work of [@gwlsn](https://github.com/gwlsn) and the original [shrinkray](https://github.com/gwlsn/shrinkray) project. Thank you for creating such a useful tool and making it open source.
 
-Additional contributions from [@akaBilih](https://github.com/akaBilih) for the tabbed layout feature.
+Additional contributions from [@akaBilih](https://github.com/akaBilih):
+- **Authentication system** — Complete OIDC and password authentication implementation 
+- **Tabbed layout** — Optional tabbed UI with activity badges for queue and active jobs
+- **Queue management** — Manual reordering, processed history tracking, smart duplicate detection
+- **UI enhancements** — Collapsible panels, virtual scroll performance, directory history navigation, sorting and filtering controls
+- **Job features** — Elapsed time display with clock skew handling, processed indicators, bulk selection with exclusion of already processed files
+- **Progress streaming** — Improved SSE reliability and ffmpeg progress parsing with fallback support
+- **File management** — Video info modal with probe details, tmp file hiding, processed file tracking
+- **Configuration** — Config file watcher for auto-reload
+- **Notifications** — ntfy support
+- **Developer experience** — Docker build updates, error handling improvements, numerous bug fixes
 
 ---
 
