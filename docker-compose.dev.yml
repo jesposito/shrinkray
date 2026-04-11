@@ -1,7 +1,21 @@
-version: "3.8"
-
 services:
   shrinkray:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      labels:
+        com.shrinkray.dev: "true"
+    image: shrinkray:dev
+    pull_policy: always
+    ports:
+      - "8080:8080"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      # iHD Driver Supports gen8+ (Intel default)
+      # - LIBVA_DRIVER_NAME=i965 # Older Intel i965 Driver: Supports gen5+
+    devices:
+      - /dev/dri:/dev/dri
     volumes:
       - ./testdata:/media
       - ./config:/config
