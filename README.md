@@ -21,12 +21,10 @@ Both projects share the same core goal: make video transcoding simple and access
 
 | Use Case | Recommendation |
 |----------|----------------|
-| Simple home setup, no auth needed | [Original](https://github.com/gwlsn/shrinkray) — cleaner, more focused |
 | Intel Arc GPU (A380, A770, B580) | **This fork** — extensive VAAPI fixes |
 | AMD GPU on Linux | **This fork** — improved VAAPI support |
 | Need authentication (OIDC/password) | **This fork** — full auth support |
 | Want ntfy notifications | **This fork** — ntfy + Pushover |
-| Prefer mature, stable release | [Original](https://github.com/gwlsn/shrinkray) |
 
 Both versions include: GPU acceleration, scheduling, quality controls, batch selection, Pushover notifications, and smart skipping.
 
@@ -62,17 +60,26 @@ Both versions include: GPU acceleration, scheduling, quality controls, batch sel
 ```yaml
 services:
   shrinkray:
-    image: ghcr.io/jesposito/shrinkray:latest
+    build: .
     container_name: shrinkray
+    # runtime: nvidia # Uncomment for NVIDIA GPUs
     ports:
-      - 8080:8080
+      - "8080:8080"
     volumes:
-      - /path/to/config:/config
-      - /path/to/media:/media
-      - /path/to/fast/storage:/temp  # Optional: SSD for temp files
+      - ./config:/config
+      - /path/to/your/media:/media  # Change this to your media path
     environment:
-      - PUID=99
-      - PGID=100
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+      # NVIDIA GPU settings (uncomment for NVIDIA GPUs)
+      # - NVIDIA_VISIBLE_DEVICES=all
+      # Older Intel i965 Driver: Supports gen5+
+      # - LIBVA_DRIVER_NAME=i965
+    # GPU passthrough for hardware transcoding (Intel/AMD VAAPI)
+    # Uncomment the devices section below for GPU access
+    # devices:
+    #   - /dev/dri:/dev/dri
     restart: unless-stopped
 ```
 
@@ -82,8 +89,8 @@ services:
 docker run -d \
   --name shrinkray \
   -p 8080:8080 \
-  -e PUID=99 \
-  -e PGID=100 \
+  -e PUID=1000 \
+  -e PGID=1000 \
   -v /path/to/config:/config \
   -v /path/to/media:/media \
   ghcr.io/jesposito/shrinkray:latest
@@ -112,35 +119,14 @@ Shrinkray automatically detects and uses the best available hardware encoder—n
 
 | Platform | Requirements | Docker Flags |
 |----------|--------------|--------------|
-| **NVIDIA (NVENC)** | GTX 1050+ / RTX series | `--runtime=nvidia --gpus all` |
+| **NVIDIA (NVENC)** | GTX 1050+ / RTX series | `--runtime=nvidia` |
 | **Intel Quick Sync** | 6th gen+ CPU | `--device /dev/dri:/dev/dri` |
 | **Intel Arc** | Arc A-series / B-series | `--device /dev/dri:/dev/dri` + see below |
 | **AMD (VAAPI)** | Polaris+ GPU on Linux | `--device /dev/dri:/dev/dri` |
 | **Apple (VideoToolbox)** | Any Mac (M1/M2/M3 or Intel) | Native (no Docker) |
 
-### Intel Arc GPU Setup
 
-Intel Arc GPUs (A380, A770, B580, etc.) require specific configuration:
-
-```bash
-docker run -d \
-  --name shrinkray \
-  --device /dev/dri:/dev/dri \
-  --group-add render \
-  -e LIBVA_DRIVER_NAME=iHD \
-  -e PUID=99 \
-  -e PGID=100 \
-  -p 8080:8080 \
-  -v /path/to/config:/config \
-  -v /path/to/media:/media \
-  ghcr.io/jesposito/shrinkray:latest
-```
-
-Key settings:
-- `--device /dev/dri:/dev/dri` — Pass GPU device to container
-- `--group-add render` — Add render group permissions (may need GID like `105`)
-- `-e LIBVA_DRIVER_NAME=iHD` — Intel Arc requires the iHD driver
-
+### Intel/AMD VAAPI
 Verify GPU access:
 ```bash
 docker exec -it shrinkray vainfo
@@ -164,8 +150,6 @@ AV1 hardware encoding requires newer GPUs:
 | Exit code 218 mid-encode | 10-bit/HDR format mismatch | Update to latest version (auto-detects bit depth) |
 | "auto_scale_0" filter error | Missing VAAPI filter chain | Update to latest version (fixed) |
 | "Cannot open DRM render node" | No GPU access | Add `--device /dev/dri:/dev/dri` |
-| "vaInitialize failed" | Wrong driver | Set `LIBVA_DRIVER_NAME=iHD` for Intel Arc |
-| "Permission denied" | Render group missing | Add `--group-add render` or GID |
 | MPEG4/XVID decode failures | Legacy codec VAAPI issue | Update to latest version (fixed) |
 
 ---

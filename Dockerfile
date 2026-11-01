@@ -14,7 +14,6 @@ FROM linuxserver/ffmpeg:latest
 # This provides VAAPI support for Intel Arc A380 and similar GPUs
 # Note: linuxserver/ffmpeg is Ubuntu-based
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    intel-media-va-driver-non-free \
     vainfo \
     && rm -rf /var/lib/apt/lists/*
 
@@ -29,8 +28,3 @@ ENTRYPOINT ["/init"]
 
 EXPOSE 8080
 VOLUME /config /media
-
-# Environment variables for Intel Arc VAAPI
-# LIBVA_DRIVER_NAME=iHD is required for Intel Arc GPUs
-# Users can override these in docker-compose.yml if needed
-ENV LIBVA_DRIVER_NAME=iHD
